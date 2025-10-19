@@ -167,7 +167,7 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <CommunityHeader onCreatePost={() => setIsCreatingPost(true)} />
+      {/* <CommunityHeader onCreatePost={() => setIsCreatingPost(true)} /> */}
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         <div className="flex flex-col items-center">
