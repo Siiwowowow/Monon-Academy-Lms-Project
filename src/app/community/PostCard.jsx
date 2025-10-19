@@ -1,11 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
-import { FaThumbsUp, FaComment, FaShare, FaGlobe, FaEllipsisH, FaEdit, FaTrash, FaUser } from 'react-icons/fa';
+import React from 'react';
+import { FaThumbsUp, FaComment, FaShare, FaGlobe, FaEllipsisH } from 'react-icons/fa';
 
-const PostCard = ({ post, onLike, onDelete, onEdit, currentUser }) => {
-  const [showMenu, setShowMenu] = useState(false);
-
+const PostCard = ({ post, onLike }) => {
   // Format timestamp
   const formatTimeAgo = (timestamp) => {
     if (!timestamp) return 'Just now';
@@ -32,41 +30,33 @@ const PostCard = ({ post, onLike, onDelete, onEdit, currentUser }) => {
 
   // Get optimized image dimensions
   const getImageDimensions = (count, index) => {
-    if (count === 1) return "h-64";
-    if (count === 2) return "h-48";
-    if (count === 3 && index === 0) return "h-48 row-span-2";
-    if (count === 3) return "h-24";
-    return "h-32";
+    if (count === 1) return "h-64"; // Reduced from h-96
+    if (count === 2) return "h-48"; // Reduced from h-64
+    if (count === 3 && index === 0) return "h-48 row-span-2"; // Reduced
+    if (count === 3) return "h-24"; // Reduced from h-32
+    return "h-32"; // Reduced from h-48
   };
 
   // Get user data with fallbacks
   const getUserData = () => {
+    // Handle different user data structures from API
     if (post.user) {
       return {
         name: post.user.name || post.user.displayName || "User",
         avatar: post.user.photoURL || post.user.avatar || "/default-avatar.png",
-        email: post.user.email,
-        id: post.user._id
+        email: post.user.email
       };
     }
     
+    // Fallback for direct user data
     return {
       name: post.userName || "User",
       avatar: post.userAvatar || "/default-avatar.png",
-      email: post.userEmail,
-      id: post.userId
+      email: post.userEmail
     };
   };
 
-  // Check if current user owns this post
-  const isOwnPost = currentUser && (
-    post.userId === currentUser._id || 
-    post.user?._id === currentUser._id ||
-    getUserData().id === currentUser._id
-  );
-
   const userData = getUserData();
-  const isLiked = currentUser && post.likedBy?.includes(currentUser._id);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 w-full max-w-2xl mx-auto mb-4 shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -91,52 +81,9 @@ const PostCard = ({ post, onLike, onDelete, onEdit, currentUser }) => {
           </div>
         </div>
         
-        {/* Menu Button - Only show if user is logged in */}
-        {currentUser && (
-          <div className="relative flex-shrink-0">
-            <button 
-              onClick={() => setShowMenu(!showMenu)}
-              className="p-1 rounded-full hover:bg-gray-100 text-gray-400 transition-colors"
-            >
-              <FaEllipsisH className="w-4 h-4" />
-            </button>
-            
-            {/* Dropdown Menu */}
-            {showMenu && (
-              <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
-                {isOwnPost ? (
-                  <>
-                    <button
-                      onClick={() => {
-                        onEdit(post);
-                        setShowMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
-                    >
-                      <FaEdit className="w-3 h-3" />
-                      <span>Edit</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        onDelete(post._id);
-                        setShowMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
-                    >
-                      <FaTrash className="w-3 h-3" />
-                      <span>Delete</span>
-                    </button>
-                  </>
-                ) : (
-                  <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2">
-                    <FaUser className="w-3 h-3" />
-                    <span>Report</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+        <button className="p-1 rounded-full hover:bg-gray-100 text-gray-400 transition-colors flex-shrink-0">
+          <FaEllipsisH className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Compact Content */}
@@ -193,13 +140,13 @@ const PostCard = ({ post, onLike, onDelete, onEdit, currentUser }) => {
       {/* Compact Action Buttons */}
       <div className="px-2 py-1 border-t border-gray-100 grid grid-cols-3 text-xs">
         <button 
-          onClick={() => onLike(post._id)} 
+          onClick={() => onLike(post._id || post.id)} 
           className={`flex items-center justify-center space-x-1 py-2 rounded-lg transition-colors ${
-            isLiked ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-100'
+            post.liked ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
           <FaThumbsUp className="w-3 h-3" /> 
-          <span>{isLiked ? 'Liked' : 'Like'}</span>
+          <span>Like</span>
         </button>
         
         <button className="flex items-center justify-center space-x-1 py-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">

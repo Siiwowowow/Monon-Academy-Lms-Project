@@ -11,7 +11,7 @@ import PostCard from "./PostCard";
 import CreatePostModal from "./CreatePostModal";
 
 export default function CommunityPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const axiosSecure = useAxiosSecure();
 
   const [posts, setPosts] = useState([]);
@@ -20,15 +20,11 @@ export default function CommunityPage() {
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [isPosting, setIsPosting] = useState(false);
-  const [editingPost, setEditingPost] = useState(null);
 
   // Infinite scroll states
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(true);
   const [loading, setLoading] = useState(false);
-
-  // Check if user is authenticated
-  const isAuthenticated = !!user;
 
   // 👉 Fetch posts from API
   const fetchPosts = async (pageNumber = 1) => {
@@ -63,13 +59,6 @@ export default function CommunityPage() {
   // 📡 Create new post
   const handlePostSubmit = async (e) => {
     e.preventDefault();
-    
-    // Authentication check
-    if (!isAuthenticated) {
-      toast.error('Please sign in to create a post');
-      return;
-    }
-
     if (!newPost.trim() && selectedImages.length === 0) {
       toast.error('Please add some content or image to post');
       return;
@@ -82,15 +71,15 @@ export default function CommunityPage() {
       const payload = {
         content: newPost,
         images: selectedImages,
-        userId: user._id,
+        userId: user?._id || "guest",
         user: {
-          _id: user._id,
-          name: user.name || user.displayName,
-          photoURL: user.photoURL,
-          email: user.email
+          _id: user?._id,
+          name: user?.name || user?.displayName,
+          photoURL: user?.photoURL,
+          email: user?.email
         },
-        userName: user.name || user.displayName || "User",
-        userAvatar: user.photoURL || "/default-avatar.png",
+        userName: user?.name || user?.displayName || "User",
+        userAvatar: user?.photoURL || "/default-avatar.png",
         createdAt: new Date().toISOString()
       };
 
@@ -111,11 +100,6 @@ export default function CommunityPage() {
 
   // 📷 Handle photo upload from CreatePostCard
   const handlePhotoClick = (file) => {
-    if (!isAuthenticated) {
-      toast.error('Please sign in to create a post');
-      return;
-    }
-
     const reader = new FileReader();
     reader.onload = (e) => {
       setSelectedImages([e.target.result]);
@@ -130,11 +114,6 @@ export default function CommunityPage() {
 
   // 👍 Like post
   const handleLike = async (postId) => {
-    if (!isAuthenticated) {
-      toast.error('Please sign in to like posts');
-      return;
-    }
-
     try {
       // Optimistic update
       setPosts((prev) =>
@@ -142,12 +121,12 @@ export default function CommunityPage() {
           p._id === postId ? { 
             ...p, 
             likes: (p.likes || 0) + 1,
-            likedBy: [...(p.likedBy || []), user._id]
+            liked: true 
           } : p
         )
       );
 
-      await axiosSecure.put(`/api/posts/${postId}/like`, { userId: user._id });
+      await axiosSecure.put(`/api/posts/${postId}`, { action: "like" });
       toast.success('Liked! 💙');
     } catch (error) {
       console.error("❌ Error liking post:", error);
@@ -157,102 +136,12 @@ export default function CommunityPage() {
           p._id === postId ? { 
             ...p, 
             likes: (p.likes || 0) - 1,
-            likedBy: (p.likedBy || []).filter(id => id !== user._id)
+            liked: false 
           } : p
         )
       );
       toast.error('Failed to like post');
     }
-  };
-
-  // 🗑️ Delete post
-  const handleDeletePost = async (postId) => {
-    if (!isAuthenticated) {
-      toast.error('Please sign in to delete posts');
-      return;
-    }
-
-    const postToDelete = posts.find(p => p._id === postId);
-    
-    // Check if user owns the post
-    if (postToDelete.userId !== user._id && postToDelete.user._id !== user._id) {
-      toast.error('You can only delete your own posts');
-      return;
-    }
-
-    if (!confirm('Are you sure you want to delete this post?')) {
-      return;
-    }
-
-    try {
-      await axiosSecure.delete(`/api/posts/${postId}`);
-      setPosts(posts.filter(p => p._id !== postId));
-      toast.success('Post deleted successfully');
-    } catch (error) {
-      console.error("❌ Error deleting post:", error);
-      toast.error('Failed to delete post');
-    }
-  };
-
-  // ✏️ Update post
-  const handleUpdatePost = async (postId, updatedContent, updatedImages) => {
-    if (!isAuthenticated) {
-      toast.error('Please sign in to update posts');
-      return;
-    }
-
-    const postToUpdate = posts.find(p => p._id === postId);
-    
-    // Check if user owns the post
-    if (postToUpdate.userId !== user._id && postToUpdate.user._id !== user._id) {
-      toast.error('You can only edit your own posts');
-      return;
-    }
-
-    try {
-      const res = await axiosSecure.put(`/api/posts/${postId}`, {
-        content: updatedContent,
-        images: updatedImages
-      });
-
-      setPosts(posts.map(p => 
-        p._id === postId ? { ...p, ...res.data.post } : p
-      ));
-      
-      setEditingPost(null);
-      toast.success('Post updated successfully');
-    } catch (error) {
-      console.error("❌ Error updating post:", error);
-      toast.error('Failed to update post');
-    }
-  };
-
-  // ➕ Start creating post (with auth check)
-  const handleCreatePostClick = () => {
-    if (!isAuthenticated) {
-      toast.error('Please sign in to create a post');
-      return;
-    }
-    setIsCreatingPost(true);
-  };
-
-  // ✏️ Start editing post
-  const handleEditPost = (post) => {
-    if (!isAuthenticated) {
-      toast.error('Please sign in to edit posts');
-      return;
-    }
-
-    // Check if user owns the post
-    if (post.userId !== user._id && post.user._id !== user._id) {
-      toast.error('You can only edit your own posts');
-      return;
-    }
-
-    setEditingPost(post);
-    setNewPost(post.content);
-    setSelectedImages(post.images || []);
-    setIsCreatingPost(true);
   };
 
   // 🚀 Load more on scroll
@@ -276,58 +165,22 @@ export default function CommunityPage() {
     fetchPosts(page);
   }, [page]);
 
-  // Reset form when closing modal
-  useEffect(() => {
-    if (!isCreatingPost) {
-      setNewPost("");
-      setSelectedImages([]);
-      setEditingPost(null);
-    }
-  }, [isCreatingPost]);
-
   return (
     <div className="min-h-screen bg-gray-100">
-      <CommunityHeader onCreatePost={handleCreatePostClick} />
+      <CommunityHeader onCreatePost={() => setIsCreatingPost(true)} />
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         <div className="flex flex-col items-center">
-          {/* Show sign in prompt for guests */}
-          {!isAuthenticated && !authLoading && (
-            <div className="w-full max-w-2xl mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-yellow-800">Sign in required</h3>
-                  <p className="text-yellow-700 text-sm">Please sign in to create posts and interact with the community</p>
-                </div>
-                <button 
-                  onClick={() => toast.error('Please implement sign in functionality')}
-                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
-                >
-                  Sign In
-                </button>
-              </div>
-            </div>
-          )}
-
           <div className="w-full max-w-2xl mb-6">
             <CreatePostCard
               user={user}
-              onPostClick={handleCreatePostClick}
+              onPostClick={() => {
+                setIsCreatingPost(true);
+                toast('Share your thoughts with the community! 💭');
+              }}
               onPhotoClick={handlePhotoClick}
-              onVideoClick={() => {
-                if (!isAuthenticated) {
-                  toast.error('Please sign in to create posts');
-                  return;
-                }
-                toast.error('Video upload coming soon! 🎥');
-              }}
-              onFeelingClick={() => {
-                if (!isAuthenticated) {
-                  toast.error('Please sign in to create posts');
-                  return;
-                }
-                toast('Feeling selector coming soon! 😊');
-              }}
+              onVideoClick={() => toast.error('Video upload coming soon! 🎥')}
+              onFeelingClick={() => toast('Feeling selector coming soon! 😊')}
             />
           </div>
 
@@ -341,27 +194,18 @@ export default function CommunityPage() {
           <div className="w-full max-w-2xl space-y-6">
             {posts.length === 0 && !loading && (
               <div className="text-center text-gray-500 py-8">
-                <p className="text-lg">No posts yet. {isAuthenticated ? 'Be the first to share! ✨' : 'Sign in to be the first to share! ✨'}</p>
-                {isAuthenticated && (
-                  <button 
-                    onClick={handleCreatePostClick}
-                    className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-                  >
-                    Create First Post
-                  </button>
-                )}
+                <p className="text-lg">No posts yet. Be the first to share! ✨</p>
+                <button 
+                  onClick={() => setIsCreatingPost(true)}
+                  className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+                >
+                  Create First Post
+                </button>
               </div>
             )}
 
             {posts.map((post) => (
-              <PostCard 
-                key={post._id} 
-                post={post} 
-                onLike={handleLike}
-                onDelete={handleDeletePost}
-                onEdit={handleEditPost}
-                currentUser={user}
-              />
+              <PostCard key={post._id} post={post} onLike={handleLike} />
             ))}
 
             {loading && (
@@ -389,13 +233,11 @@ export default function CommunityPage() {
             if (confirm('You have unsaved changes. Are you sure you want to close?')) {
               setIsCreatingPost(false);
               setSelectedImages([]);
-              setEditingPost(null);
               toast('Post draft discarded');
             }
           } else {
             setIsCreatingPost(false);
             setSelectedImages([]);
-            setEditingPost(null);
           }
         }}
         user={user}
@@ -405,9 +247,6 @@ export default function CommunityPage() {
         setSelectedImages={setSelectedImages}
         handlePostSubmit={handlePostSubmit}
         isPosting={isPosting}
-        isEditing={!!editingPost}
-        editingPost={editingPost}
-        onUpdatePost={handleUpdatePost}
       />
     </div>
   );
