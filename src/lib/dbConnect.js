@@ -4,6 +4,10 @@ export const collectionNameObj = {
     userCollection: "users",
     coursesCollection:"courses",
     postCollection:"posts",
+    questionCollection:"questions",
+    answerCollection:"answers",
+    examCollection:"exams",
+    
     
   };
 const uri = process.env.MONGODB_URI;
