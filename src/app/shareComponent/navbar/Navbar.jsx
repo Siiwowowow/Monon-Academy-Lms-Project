@@ -43,6 +43,7 @@ export default function Navbar() {
     { name: "Dashboard", href: "/dashboard", icon: <FaTachometerAlt />, authRequired: true }, // Added authRequired flag
     { name: "Contact", href: "/contact", icon: <FaPhoneAlt /> },
     { name: "Community", href: "/community", icon: <FaInfoCircle /> }, // Capitalized for better appearance
+    { name: "Video", href: "/video", icon: <FaInfoCircle />}, 
   ];
 
   // Conditional filtering of navLinks
