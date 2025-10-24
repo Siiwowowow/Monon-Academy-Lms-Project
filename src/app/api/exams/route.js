@@ -1,63 +1,97 @@
 // app/api/exams/route.js
-import dbConnect, { collectionNameObj } from '@/lib/dbConnect';
-import { NextResponse } from 'next/server';
+import dbConnect, { collectionNameObj } from "@/lib/dbConnect";
+import { NextResponse } from "next/server";
+import { writeFile, mkdir } from 'fs/promises';
+import path from 'path';
 
-// GET - Fetch all exams for teacher
-export async function GET(request) {
+export async function POST(req) {
   try {
-    const { searchParams } = new URL(request.url);
-    const teacherId = searchParams.get('teacherId');
-    const subject = searchParams.get('subject');
-    const classLevel = searchParams.get('classLevel');
-    const educationBoard = searchParams.get('educationBoard');
+    const formData = await req.formData();
+    const examData = JSON.parse(formData.get('examData'));
 
-    const examsCollection = await dbConnect(collectionNameObj.examCollection);
-    
-    // Build filter based on query parameters
-    let filter = {};
-    if (teacherId) filter.teacherId = teacherId;
-    if (subject) filter.subject = subject;
-    if (classLevel) filter.classLevel = classLevel;
-    if (educationBoard) filter.educationBoard = educationBoard;
+    // Handle main exam image upload
+    let photoURL = null;
+    const examImage = formData.get('examImage');
+    if (examImage) {
+      const uploadsDir = path.join(process.cwd(), 'public/uploads/exams');
+      await mkdir(uploadsDir, { recursive: true });
+      
+      const timestamp = Date.now();
+      const filename = `exam_${timestamp}${path.extname(examImage.name)}`;
+      const filePath = path.join(uploadsDir, filename);
+      
+      const bytes = await examImage.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      await writeFile(filePath, buffer);
+      
+      photoURL = `/uploads/exams/${filename}`;
+    }
 
-    const exams = await examsCollection.find(filter)
-      .sort({ createdAt: -1 })
-      .toArray();
-    
-    return NextResponse.json({ success: true, data: exams });
+    // Handle question images upload
+    const questionsWithImages = await Promise.all(
+      examData.questions.map(async (question, index) => {
+        const questionImage = formData.get(`questionImage_${index}`);
+        let questionImageURL = null;
+
+        if (questionImage) {
+          const uploadsDir = path.join(process.cwd(), 'public/uploads/questions');
+          await mkdir(uploadsDir, { recursive: true });
+          
+          const timestamp = Date.now();
+          const filename = `question_${timestamp}_${index}${path.extname(questionImage.name)}`;
+          const filePath = path.join(uploadsDir, filename);
+          
+          const bytes = await questionImage.arrayBuffer();
+          const buffer = Buffer.from(bytes);
+          await writeFile(filePath, buffer);
+          
+          questionImageURL = `/uploads/questions/${filename}`;
+        }
+
+        return {
+          ...question,
+          questionImage: questionImageURL
+        };
+      })
+    );
+
+    const examCollection = await dbConnect(collectionNameObj.examCollection);
+
+    const result = await examCollection.insertOne({
+      ...examData,
+      photoURL,
+      questions: questionsWithImages,
+      createdAt: new Date(),
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Exam created successfully!",
+      insertedId: result.insertedId,
+    });
   } catch (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    console.error("Error creating exam:", error);
+    return NextResponse.json(
+      { success: false, message: "Failed to create exam" },
+      { status: 500 }
+    );
   }
 }
 
-// POST - Create new exam
-export async function POST(request) {
+export async function GET(req) {
   try {
-    const examData = await request.json();
-    
-    if (!examData.teacherId) {
-      return NextResponse.json({ message: 'Teacher ID required' }, { status: 400 });
-    }
+    const examCollection = await dbConnect(collectionNameObj.examCollection);
+    const exams = await examCollection.find({}).toArray();
 
-    const examsCollection = await dbConnect(collectionNameObj.examCollection);
-    
-    const examWithTimestamp = {
-      ...examData,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isPublished: false
-    };
-
-    const result = await examsCollection.insertOne(examWithTimestamp);
-    
-    return NextResponse.json({ 
-      success: true, 
-      data: {
-        _id: result.insertedId,
-        ...examWithTimestamp
-      }
-    }, { status: 201 });
+    return NextResponse.json({
+      success: true,
+      exams,
+    });
   } catch (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    console.error("Error fetching exams:", error);
+    return NextResponse.json(
+      { success: false, message: "Failed to fetch exams" },
+      { status: 500 }
+    );
   }
 }

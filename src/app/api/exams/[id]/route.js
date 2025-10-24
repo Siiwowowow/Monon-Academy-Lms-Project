@@ -1,29 +1,27 @@
-import dbConnect, { collectionNameObj } from '@/lib/dbConnect';
-import { ObjectId } from 'mongodb';
+ import dbConnect, { collectionNameObj } from "@/lib/dbConnect";
+import { NextResponse } from "next/server";
+import { ObjectId } from "mongodb";
 
 export async function GET(req, { params }) {
-  const { id } = params;
-
   try {
-    const collection = await dbConnect(collectionNameObj.examCollection);
-    const exam = await collection.findOne({ _id: new ObjectId(id) });
+    const examCollection = await dbConnect(collectionNameObj.examCollection);
+    const examId = params.id;
+
+    // Find exam by _id
+    const exam = await examCollection.findOne({ _id: new ObjectId(examId) });
 
     if (!exam) {
-      return new Response(
-        JSON.stringify({ success: false, message: 'Exam not found' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      );
+      return NextResponse.json({ success: false, message: "Exam not found" }, { status: 404 });
     }
 
-    return new Response(JSON.stringify({ success: true, data: exam }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return NextResponse.json({ success: true, exam });
   } catch (error) {
-    console.error(error);
-    return new Response(
-      JSON.stringify({ success: false, message: 'Server error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    console.error("Error fetching exam:", error);
+    return NextResponse.json(
+      { success: false, message: "Failed to fetch exam" },
+      { status: 500 }
     );
   }
 }
+
+// Optional: you can also add DELETE or PUT here if needed
