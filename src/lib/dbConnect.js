@@ -2,12 +2,12 @@ import { MongoClient, ServerApiVersion } from "mongodb";
 
 export const collectionNameObj = {
     userCollection: "users",
-    coursesCollection:"courses",
-    postCollection:"posts",
-    examCollection:"exams",
-    
-    
-  };
+    coursesCollection: "courses",
+    examCollection: "exams",
+    videoCollection: "videos",
+    postsCollection: "posts",
+};
+
 const uri = process.env.MONGODB_URI;
 const dbName = process.env.DB_NAME;
 
@@ -24,8 +24,6 @@ if (!client) {
   });
   clientPromise = client.connect();
 }
-
-
 
 export default async function dbConnect(collectionName) {
   await clientPromise;

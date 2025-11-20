@@ -1,51 +1,55 @@
-// export default useAxiosSecure;
-import React, { useEffect } from "react";
-import useAuth from "../hooks/useAuth";
-import axios from "axios";
+'use client'
+import React, { useEffect } from "react"
+import axios from "axios"
+import useAuth from "./useAuth"
 
-const axiosInstance=axios.create({
-    baseURL: `http://localhost:3000`,
-  
+const axiosInstance = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
 })
 
 const useAxiosSecure = () => {
-    const {user,logOut,loading}=useAuth()
- 
+  const { user } = useAuth()
 
   useEffect(() => {
-    if (!loading && user?.accessToken) {
-      // Add request interceptor
-      const requestInterceptor = axiosInstance.interceptors.request.use(
-        (config) => {
-          config.headers.Authorization = `Bearer ${user.accessToken}`;
-          return config;
-        }
-      );
-
-      // Add response interceptor
-      const responseInterceptor = axiosInstance.interceptors.response.use(
-        (res) => res,
-        (err) => {
-          if (err?.response?.status === 401 || err?.response?.status === 403) {
-            logOut()
-              .then(() => {
-                console.log("Logged out due to token issue.");
-              })
-              .catch(console.error);
+    // Request interceptor to add Firebase token
+    const requestInterceptor = axiosInstance.interceptors.request.use(
+      async (config) => {
+        if (user) {
+          try {
+            // Get fresh Firebase ID token
+            const token = await user.getIdToken()
+            config.headers.Authorization = `Bearer ${token}`
+          } catch (error) {
+            console.error('Error getting token:', error)
           }
-          return Promise.reject(err);
         }
-      );
+        return config
+      },
+      (error) => {
+        return Promise.reject(error)
+      }
+    )
 
-      // Cleanup to prevent multiple interceptors on re-renders
-      return () => {
-        axiosInstance.interceptors.request.eject(requestInterceptor);
-        axiosInstance.interceptors.response.eject(responseInterceptor);
-      };
+    // Response interceptor to handle auth errors
+    const responseInterceptor = axiosInstance.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          // Token expired or invalid - redirect to login
+          console.log("Authentication failed, redirecting to login")
+          window.location.href = '/login'
+        }
+        return Promise.reject(error)
+      }
+    )
+
+    return () => {
+      axiosInstance.interceptors.request.eject(requestInterceptor)
+      axiosInstance.interceptors.response.eject(responseInterceptor)
     }
-  }, [user, loading]);
+  }, [user])
 
-  return axiosInstance;
-};
+  return axiosInstance
+}
 
-export default useAxiosSecure;
+export default useAxiosSecure

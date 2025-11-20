@@ -17,7 +17,7 @@ export default function Home() {
     <div>
       <HomeSLider/>
       <Category/>
-      <AdvancedCustomPlayer/>
+      {/* <AdvancedCustomPlayer/> */}
       
       <FeaturedCourses/>
       <VideoPlayer/>
