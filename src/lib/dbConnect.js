@@ -6,6 +6,7 @@ export const collectionNameObj = {
     examCollection: "exams",
     videoCollection: "videos",
     postsCollection: "posts",
+    paymentCollection: "payments",
 };
 
 const uri = process.env.MONGODB_URI;

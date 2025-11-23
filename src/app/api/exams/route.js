@@ -1,13 +1,29 @@
-// app/api/exams/route.js
 import dbConnect, { collectionNameObj } from "@/lib/dbConnect";
 import { NextResponse } from "next/server";
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
 
 export async function POST(req) {
   try {
     const formData = await req.formData();
     const examData = JSON.parse(formData.get('examData'));
+
+    // Get teacher email from the request body
+    const teacherEmail = formData.get('teacherEmail');
+    
+    if (!teacherEmail) {
+      return NextResponse.json(
+        { success: false, message: "Teacher email is required" },
+        { status: 400 }
+      );
+    }
+
+    // Add teacher email to exam data
+    const examDataWithTeacher = {
+      ...examData,
+      teacherEmail: teacherEmail,
+      createdBy: examData.createdBy || "Unknown Teacher"
+    };
 
     // Handle main exam image upload
     let photoURL = null;
@@ -58,10 +74,11 @@ export async function POST(req) {
     const examCollection = await dbConnect(collectionNameObj.examCollection);
 
     const result = await examCollection.insertOne({
-      ...examData,
+      ...examDataWithTeacher,
       photoURL,
       questions: questionsWithImages,
       createdAt: new Date(),
+      updatedAt: new Date(),
     });
 
     return NextResponse.json({
@@ -80,8 +97,17 @@ export async function POST(req) {
 
 export async function GET(req) {
   try {
+    const { searchParams } = new URL(req.url);
+    const teacherEmail = searchParams.get('teacherEmail');
+    
     const examCollection = await dbConnect(collectionNameObj.examCollection);
-    const exams = await examCollection.find({}).toArray();
+    
+    let query = {};
+    if (teacherEmail) {
+      query.teacherEmail = teacherEmail;
+    }
+    
+    const exams = await examCollection.find(query).sort({ createdAt: -1 }).toArray();
 
     return NextResponse.json({
       success: true,

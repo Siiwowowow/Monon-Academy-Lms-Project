@@ -127,8 +127,8 @@ export default function DashboardSidebar({ open, setOpen }) {
       links: [
         { href: "/", label: "Home", icon: <FaHome /> },
         { href: "/dashboard/teacher/overview", label: "Dashboard", icon: <FaChartLine /> },
-        { href: "/dashboard/teacher/create-course", label: "Create Course", icon: <FaPlusCircle /> },
-        { href: "/dashboard/teacher/my-courses", label: "My Courses", icon: <FaBook /> },
+        { href: "/dashboard/teacher/createCourse", label: "Create Course", icon: <FaPlusCircle /> },
+        { href: "/dashboard/teacher/myCourses", label: "My Courses", icon: <FaBook /> },
         { href: "/dashboard/teacher/create-exam", label: "Create Exam", icon: <FaPen /> },
         { href: "/dashboard/teacher/exams", label: "Exams", icon: <FaClipboardList /> },
         { href: "/dashboard/teacher/classes", label: "Classes", icon: <FaChalkboardTeacher /> },

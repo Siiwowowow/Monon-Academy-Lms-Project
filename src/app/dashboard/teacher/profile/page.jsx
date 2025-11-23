@@ -39,6 +39,25 @@ export default function Profile() {
     fetchUserProfile();
   }, [axiosSecure, authUser]);
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">Profile Not Found</h3>
+          <p className="text-gray-500">Unable to load user profile</p>
+        </div>
+      </div>
+    );
+  }
+
   const formatDateTime = (dateString) => {
     if (!dateString) return 'N/A';
     try {
@@ -98,25 +117,6 @@ export default function Profile() {
     };
     return roles[role] || roles.user;
   };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-center">
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">Profile Not Found</h3>
-          <p className="text-gray-500">Unable to load user profile</p>
-        </div>
-      </div>
-    );
-  }
 
   const roleInfo = getRoleDisplay(user.role);
 
@@ -187,12 +187,7 @@ export default function Profile() {
                     </p>
                   </div>
 
-                  <div className="flex gap-3">
-                    <button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2 font-semibold">
-                      <FaEdit />
-                      Edit Profile
-                    </button>
-                  </div>
+                  
                 </div>
               </div>
             </div>

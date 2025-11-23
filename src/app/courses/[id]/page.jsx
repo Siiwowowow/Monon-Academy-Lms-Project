@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { Star, PlayCircle, Clock, User, BookOpen, ArrowLeft, Video, CheckCircle } from "lucide-react";
 import Link from "next/link";
-import PaymentModal from "../PaymentModal";
+import PaymentModal from "../Payment/PaymentModal";
+
 
 export default function CourseDetails({ params }) {
   const { id } = params;
@@ -100,30 +101,42 @@ export default function CourseDetails({ params }) {
     }
   };
 
-  const handleStripePayment = async () => {
-    try {
-      const response = await fetch('/api/create-payment-intent', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          courseId: id,
-          courseTitle: course.title,
-          price: course.price,
-          currency: 'bdt'
-        })
-      });
+ const handleStripePayment = async () => {
+  try {
+    setProcessingPayment(true);
+    
+    const response = await fetch('/api/create-payment-intent', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        courseId: id,
+        courseTitle: course.title,
+        price: course.price,
+        currency: 'bdt'
+      })
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (data.clientSecret) {
-        window.location.href = `/payment/stripe?client_secret=${data.clientSecret}&course_id=${id}`;
-      }
-    } catch (error) {
-      throw error;
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to create payment');
     }
-  };
+
+    if (data.clientSecret) {
+      // Redirect to real Stripe payment page
+      window.location.href = `/payment/stripe?client_secret=${data.clientSecret}&course_id=${id}`;
+    } else {
+      throw new Error('No client secret received');
+    }
+  } catch (error) {
+    console.error('Stripe payment error:', error);
+    alert(`Payment failed: ${error.message}`);
+    setProcessingPayment(false);
+    setShowPaymentModal(false);
+  }
+};
 
   const handleSSLCommerzPayment = async () => {
     try {
