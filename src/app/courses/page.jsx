@@ -2,10 +2,14 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import useAuth from '@/hooks/useAuth';
 
 export default function Courses() {
   const [courses, setCourses] = useState([]);
+  const [enrolledCourseIds, setEnrolledCourseIds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [enrollmentLoading, setEnrollmentLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [group, setGroup] = useState('');
@@ -13,6 +17,10 @@ export default function Courses() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCourses, setTotalCourses] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
+  
+  const { user } = useAuth();
+  const router = useRouter();
+  const currentUserEmail = user?.email;
 
   // Color schemes for different course types
   const courseTypeColors = {
@@ -55,6 +63,17 @@ export default function Courses() {
       icon: 'text-blue-500',
       gradient: 'from-blue-400 to-blue-600',
       tag: 'নতুন'
+    },
+    // ENROLLED COURSE STYLING
+    enrolled: {
+      badge: 'bg-green-100 text-green-800 border-green-200',
+      price: 'text-green-600',
+      button: 'bg-green-500 hover:bg-green-600 text-white',
+      icon: 'text-green-500',
+      gradient: 'from-green-400 to-green-600',
+      tag: 'এনরোল্ড',
+      card: 'border-green-200 hover:border-green-300',
+      status: 'bg-green-100 text-green-800'
     }
   };
 
@@ -66,8 +85,41 @@ export default function Courses() {
     'default': 'bg-gray-50 text-gray-700 border-gray-200'
   };
 
+  // Fetch enrolled courses for current user
+  const fetchEnrolledCourses = useCallback(async () => {
+    if (!currentUserEmail) {
+      setEnrollmentLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/user-courses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userEmail: currentUserEmail }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Extract course IDs from enrolled courses
+        const enrolledIds = data.courses?.map(course => course.courseId || course._id) || [];
+        setEnrolledCourseIds(enrolledIds);
+      }
+    } catch (err) {
+      console.error('Error fetching enrolled courses:', err);
+    } finally {
+      setEnrollmentLoading(false);
+    }
+  }, [currentUserEmail]);
+
   // Determine course type
   const getCourseType = (course) => {
+    // First check if course is enrolled
+    if (enrolledCourseIds.includes(course._id)) {
+      return 'enrolled';
+    }
     if (course.price === 0) return 'free';
     if (course.original_price > course.price) return 'discounted';
     if (course.is_popular) return 'popular';
@@ -122,8 +174,14 @@ export default function Courses() {
   );
 
   useEffect(() => {
-    fetchCourses();
-  }, [fetchCourses]);
+    fetchEnrolledCourses();
+  }, [fetchEnrolledCourses]);
+
+  useEffect(() => {
+    if (!enrollmentLoading) {
+      fetchCourses();
+    }
+  }, [fetchCourses, enrollmentLoading]);
 
   // Handle search input change with debounce
   const handleSearchChange = (e) => {
@@ -145,8 +203,17 @@ export default function Courses() {
     setShowFilters(false);
   };
 
+  const handleCardClick = (courseId, isEnrolled) => {
+    if (isEnrolled) {
+      router.push(`/dashboard/user/enroll`);
+    } else {
+      router.push(`/courses/${courseId}`);
+    }
+  };
+
   // Course card component
   const CourseCard = ({ course }) => {
+    const isEnrolled = enrolledCourseIds.includes(course._id);
     const courseType = getCourseType(course);
     const colors = courseTypeColors[courseType];
     const groupColor = groupColors[course.group] || groupColors.default;
@@ -165,7 +232,12 @@ export default function Courses() {
     const imageUrl = course.thumbnail_url || defaultImages[course.group] || defaultImages.default;
 
     return (
-      <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border border-gray-200 overflow-hidden flex flex-col h-full">
+      <div 
+        className={`bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border ${
+          isEnrolled ? 'border-green-200 hover:border-green-300' : 'border-gray-200'
+        } overflow-hidden flex flex-col h-full cursor-pointer`}
+        onClick={() => handleCardClick(course._id, isEnrolled)}
+      >
         {/* Image Container with consistent aspect ratio */}
         <div className="relative w-full pt-[56.25%] bg-gray-100 overflow-hidden">
           <img 
@@ -182,15 +254,22 @@ export default function Courses() {
             {colors.tag}
           </div>
 
+          {/* Enrolled Status Badge */}
+          {isEnrolled && (
+            <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold border bg-green-100 text-green-800 border-green-200">
+              ✓ সম্পূর্ণ
+            </div>
+          )}
+
           {/* Discount Badge */}
-          {discountPercentage > 0 && (
+          {!isEnrolled && discountPercentage > 0 && (
             <div className="absolute top-3 right-3 bg-gradient-to-r from-red-500 to-pink-600 text-white px-2 py-1 rounded text-xs font-bold">
               {discountPercentage}% OFF
             </div>
           )}
 
           {/* Free Course Ribbon */}
-          {courseType === 'free' && (
+          {!isEnrolled && courseType === 'free' && (
             <div className="absolute top-10 left-3 bg-green-500 text-white px-2 py-1 rounded text-xs font-bold">
               সম্পূর্ণ ফ্রি
             </div>
@@ -230,7 +309,9 @@ export default function Courses() {
           </p>
 
           {/* Stats */}
-          <div className="flex items-center justify-between mb-4 bg-gray-50 rounded-lg p-3">
+          <div className={`flex items-center justify-between mb-4 rounded-lg p-3 ${
+            isEnrolled ? 'bg-green-50 border border-green-100' : 'bg-gray-50'
+          }`}>
             <div className="flex items-center space-x-1">
               <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
@@ -256,25 +337,37 @@ export default function Courses() {
           {/* Price and Action */}
           <div className="flex items-center justify-between mt-auto">
             <div className="flex items-center space-x-2">
-              {course.original_price > course.price && (
+              {!isEnrolled && course.original_price > course.price && (
                 <span className="text-gray-400 text-sm line-through font-medium">
                   ৳{course.original_price}
                 </span>
               )}
               <span className={`text-lg font-bold ${colors.price}`}>
-                {course.price === 0 ? 'ফ্রি' : `৳${course.price}`}
+                {isEnrolled ? 'পেইড' : course.price === 0 ? 'ফ্রি' : `৳${course.price}`}
               </span>
             </div>
             
-            <Link 
-              href={`/courses/${course._id}`}
-              className={`${colors.button} py-2 px-4 rounded-lg font-semibold transition-all duration-200 text-sm flex items-center space-x-1`}
-            >
-              <span>বিস্তারিত</span>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
-              </svg>
-            </Link>
+            {isEnrolled ? (
+              <button 
+                className={`${colors.button} py-2 px-4 rounded-lg font-semibold transition-all duration-200 text-sm flex items-center space-x-1`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
+                </svg>
+                <span>সম্পন্ন</span>
+              </button>
+            ) : (
+              <Link 
+                href={`/courses/${course._id}`}
+                className={`${colors.button} py-2 px-4 rounded-lg font-semibold transition-all duration-200 text-sm flex items-center space-x-1`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span>বিস্তারিত</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
+                </svg>
+              </Link>
+            )}
           </div>
         </div>
       </div>
