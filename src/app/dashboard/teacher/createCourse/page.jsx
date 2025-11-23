@@ -13,7 +13,10 @@ import {
   FaLink,
   FaSave,
   FaLayerGroup,
-  FaChalkboardTeacher
+  FaChalkboardTeacher,
+  FaQuestionCircle,
+  FaListOl,
+  FaCheckCircle
 } from "react-icons/fa";
 import { MdSubject, MdClass, MdGroup } from "react-icons/md";
 import { RiFileTextFill } from "react-icons/ri";
@@ -43,7 +46,30 @@ export default function CreateCourse() {
           {
             lesson_title: "",
             video_duration: "",
-            video_url: ""
+            video_url: "",
+            // নতুন: লেসনের জন্য এক্সাম
+            exam: {
+              has_exam: false,
+              title: "",
+              description: "",
+              duration: 10, // মিনিটে
+              total_marks: 10,
+              passing_marks: 5,
+              questions: [
+                {
+                  question_text: "",
+                  question_type: "multiple_choice",
+                  options: [
+                    { id: "A", text: "" },
+                    { id: "B", text: "" },
+                    { id: "C", text: "" },
+                    { id: "D", text: "" }
+                  ],
+                  correct_answer: "A",
+                  marks: 1
+                }
+              ]
+            }
           }
         ]
       }
@@ -56,7 +82,33 @@ export default function CreateCourse() {
       ...prev,
       curriculum: [...prev.curriculum, { 
         chapter_title: `অধ্যায় ${prev.curriculum.length + 1}: নতুন অধ্যায়`, 
-        lessons: [{ lesson_title: "", video_duration: "", video_url: "" }] 
+        lessons: [{ 
+          lesson_title: "", 
+          video_duration: "", 
+          video_url: "",
+          exam: {
+            has_exam: false,
+            title: "",
+            description: "",
+            duration: 10,
+            total_marks: 10,
+            passing_marks: 5,
+            questions: [
+              {
+                question_text: "",
+                question_type: "multiple_choice",
+                options: [
+                  { id: "A", text: "" },
+                  { id: "B", text: "" },
+                  { id: "C", text: "" },
+                  { id: "D", text: "" }
+                ],
+                correct_answer: "A",
+                marks: 1
+              }
+            ]
+          }
+        }] 
       }]
     }));
   };
@@ -85,7 +137,29 @@ export default function CreateCourse() {
     newCurriculum[chapterIndex].lessons.push({ 
       lesson_title: "", 
       video_duration: "", 
-      video_url: "" 
+      video_url: "",
+      exam: {
+        has_exam: false,
+        title: "",
+        description: "",
+        duration: 10,
+        total_marks: 10,
+        passing_marks: 5,
+        questions: [
+          {
+            question_text: "",
+            question_type: "multiple_choice",
+            options: [
+              { id: "A", text: "" },
+              { id: "B", text: "" },
+              { id: "C", text: "" },
+              { id: "D", text: "" }
+            ],
+            correct_answer: "A",
+            marks: 1
+          }
+        ]
+      }
     });
     setCourse({ ...course, curriculum: newCurriculum });
     toast.success("নতুন লেসন যোগ করা হয়েছে");
@@ -110,6 +184,125 @@ export default function CreateCourse() {
     setCourse({ ...course, curriculum: newCurriculum });
   };
 
+  // Add exam to a lesson
+  const addExamToLesson = (chapterIndex, lessonIndex) => {
+    const newCurriculum = [...course.curriculum];
+    newCurriculum[chapterIndex].lessons[lessonIndex].exam = {
+      has_exam: true,
+      title: `${newCurriculum[chapterIndex].lessons[lessonIndex].lesson_title} - কুইজ` || "লেসন এক্সাম",
+      description: "এই লেসনের উপর ভিত্তি করে কুইজ",
+      duration: 10,
+      total_marks: 10,
+      passing_marks: 5,
+      questions: [
+        {
+          question_text: "",
+          question_type: "multiple_choice",
+          options: [
+            { id: "A", text: "" },
+            { id: "B", text: "" },
+            { id: "C", text: "" },
+            { id: "D", text: "" }
+          ],
+          correct_answer: "A",
+          marks: 1
+        }
+      ]
+    };
+    setCourse({ ...course, curriculum: newCurriculum });
+    toast.success("লেসনের জন্য এক্সাম যোগ করা হয়েছে");
+  };
+
+  // Remove exam from a lesson
+  const removeExamFromLesson = (chapterIndex, lessonIndex) => {
+    const newCurriculum = [...course.curriculum];
+    newCurriculum[chapterIndex].lessons[lessonIndex].exam.has_exam = false;
+    setCourse({ ...course, curriculum: newCurriculum });
+    toast.success("এক্সাম সরানো হয়েছে");
+  };
+
+  // Add question to exam
+  const addQuestionToExam = (chapterIndex, lessonIndex) => {
+    const newCurriculum = [...course.curriculum];
+    const exam = newCurriculum[chapterIndex].lessons[lessonIndex].exam;
+    
+    exam.questions.push({
+      question_text: "",
+      question_type: "multiple_choice",
+      options: [
+        { id: "A", text: "" },
+        { id: "B", text: "" },
+        { id: "C", text: "" },
+        { id: "D", text: "" }
+      ],
+      correct_answer: "A",
+      marks: 1
+    });
+    
+    exam.total_marks += 1;
+    setCourse({ ...course, curriculum: newCurriculum });
+    toast.success("নতুন প্রশ্ন যোগ করা হয়েছে");
+  };
+
+  // Remove question from exam
+  const removeQuestionFromExam = (chapterIndex, lessonIndex, questionIndex) => {
+    const newCurriculum = [...course.curriculum];
+    const exam = newCurriculum[chapterIndex].lessons[lessonIndex].exam;
+    
+    if (exam.questions.length > 1) {
+      const removedMarks = exam.questions[questionIndex].marks;
+      exam.questions = exam.questions.filter((_, i) => i !== questionIndex);
+      exam.total_marks -= removedMarks;
+      setCourse({ ...course, curriculum: newCurriculum });
+      toast.success("প্রশ্ন মুছে ফেলা হয়েছে");
+    } else {
+      toast.error("অন্তত একটি প্রশ্ন থাকতে হবে");
+    }
+  };
+
+  // Update exam question
+  const updateExamQuestion = (chapterIndex, lessonIndex, questionIndex, field, value) => {
+    const newCurriculum = [...course.curriculum];
+    const exam = newCurriculum[chapterIndex].lessons[lessonIndex].exam;
+    
+    if (field === 'correct_answer') {
+      exam.questions[questionIndex].correct_answer = value;
+    } else if (field.startsWith('option_')) {
+      const optionIndex = parseInt(field.split('_')[1]);
+      exam.questions[questionIndex].options[optionIndex].text = value;
+    } else if (field.startsWith('marks')) {
+      exam.questions[questionIndex].marks = parseInt(value);
+      // Update total marks
+      exam.total_marks = exam.questions.reduce((total, q) => total + q.marks, 0);
+    } else {
+      exam.questions[questionIndex][field] = value;
+    }
+    
+    setCourse({ ...course, curriculum: newCurriculum });
+  };
+
+  // Update exam details
+  const updateExamDetails = (chapterIndex, lessonIndex, field, value) => {
+    const newCurriculum = [...course.curriculum];
+    const exam = newCurriculum[chapterIndex].lessons[lessonIndex].exam;
+    
+    if (field === 'has_exam') {
+      exam.has_exam = value;
+    } else {
+      exam[field] = value;
+    }
+    
+    setCourse({ ...course, curriculum: newCurriculum });
+  };
+
+  // Update option text
+  const updateOptionText = (chapterIndex, lessonIndex, questionIndex, optionIndex, value) => {
+    const newCurriculum = [...course.curriculum];
+    const exam = newCurriculum[chapterIndex].lessons[lessonIndex].exam;
+    exam.questions[questionIndex].options[optionIndex].text = value;
+    setCourse({ ...course, curriculum: newCurriculum });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return toast.loading("অনুগ্রহ করে অপেক্ষা করুন...");
@@ -124,7 +317,9 @@ export default function CreateCourse() {
       const res = await axiosSecure.post("/api/courses", {
         ...course,
         instructor_email: user.email,
-        createdAt: new Date()
+        createdAt: new Date(),
+        // Calculate total videos
+        total_videos: course.curriculum.reduce((total, chapter) => total + chapter.lessons.length, 0)
       });
 
       toast.success("কোর্স সফলভাবে তৈরি হয়েছে!");
@@ -148,7 +343,29 @@ export default function CreateCourse() {
               {
                 lesson_title: "",
                 video_duration: "",
-                video_url: ""
+                video_url: "",
+                exam: {
+                  has_exam: false,
+                  title: "",
+                  description: "",
+                  duration: 10,
+                  total_marks: 10,
+                  passing_marks: 5,
+                  questions: [
+                    {
+                      question_text: "",
+                      question_type: "multiple_choice",
+                      options: [
+                        { id: "A", text: "" },
+                        { id: "B", text: "" },
+                        { id: "C", text: "" },
+                        { id: "D", text: "" }
+                      ],
+                      correct_answer: "A",
+                      marks: 1
+                    }
+                  ]
+                }
               }
             ]
           }
@@ -162,7 +379,7 @@ export default function CreateCourse() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
-      <div className="max-w-4xl mx-auto px-4">
+      <div className="max-w-6xl mx-auto px-4">
         {/* Header Section */}
         <div className="text-center mb-8">
           <div className="bg-white rounded-2xl shadow-lg p-8 border border-blue-200">
@@ -356,7 +573,8 @@ export default function CreateCourse() {
                   <div className="space-y-4">
                     {chapter.lessons.map((lesson, lIndex) => (
                       <div key={lIndex} className="bg-white rounded-lg p-4 border border-blue-200 hover:border-blue-300 transition-colors duration-200">
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+                        {/* Lesson Basic Info */}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center mb-4">
                           {/* Lesson Title */}
                           <div className="lg:col-span-5 space-y-2">
                             <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
@@ -404,12 +622,210 @@ export default function CreateCourse() {
                             <button 
                               type="button" 
                               onClick={() => removeLesson(cIndex, lIndex)}
-                              className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors duration-200 mt-6"
+                              className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors duration-200"
                               title="লেসন মুছুন"
                             >
                               <FaTrash className="text-sm" />
                             </button>
                           </div>
+                        </div>
+
+                        {/* 🔥 NEW: Exam Section for this Lesson */}
+                        <div className="border-t border-gray-200 pt-4 mt-4">
+                          <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-2">
+                              <FaQuestionCircle className="text-green-600" />
+                              <span className="font-semibold text-gray-700">লেসন এক্সাম</span>
+                            </div>
+                            
+                            {!lesson.exam?.has_exam ? (
+                              <button
+                                type="button"
+                                onClick={() => addExamToLesson(cIndex, lIndex)}
+                                className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200 text-sm"
+                              >
+                                <FaPlus className="text-xs" />
+                                এক্সাম যোগ করুন
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => removeExamFromLesson(cIndex, lIndex)}
+                                className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors duration-200 text-sm"
+                              >
+                                <FaTrash className="text-xs" />
+                                এক্সাম সরান
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Exam Details - Show only if exam exists */}
+                          {lesson.exam?.has_exam && (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-4">
+                              {/* Exam Basic Info */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="space-y-2">
+                                  <label className="block text-sm font-medium text-gray-700">
+                                    এক্সাম টাইটেল
+                                  </label>
+                                  <input
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                    value={lesson.exam.title}
+                                    onChange={(e) => updateExamDetails(cIndex, lIndex, 'title', e.target.value)}
+                                    placeholder="এক্সামের শিরোনাম"
+                                  />
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <label className="block text-sm font-medium text-gray-700">
+                                    সময় (মিনিট)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                    value={lesson.exam.duration}
+                                    onChange={(e) => updateExamDetails(cIndex, lIndex, 'duration', parseInt(e.target.value))}
+                                  />
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <label className="block text-sm font-medium text-gray-700">
+                                    মোট মার্ক
+                                  </label>
+                                  <input
+                                    type="number"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                    value={lesson.exam.total_marks}
+                                    onChange={(e) => updateExamDetails(cIndex, lIndex, 'total_marks', parseInt(e.target.value))}
+                                  />
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <label className="block text-sm font-medium text-gray-700">
+                                    পাসিং মার্ক
+                                  </label>
+                                  <input
+                                    type="number"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                    value={lesson.exam.passing_marks}
+                                    onChange={(e) => updateExamDetails(cIndex, lIndex, 'passing_marks', parseInt(e.target.value))}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Exam Description */}
+                              <div className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-700">
+                                  এক্সাম বর্ণনা
+                                </label>
+                                <textarea
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 h-20"
+                                  value={lesson.exam.description}
+                                  onChange={(e) => updateExamDetails(cIndex, lIndex, 'description', e.target.value)}
+                                  placeholder="এক্সামের বিস্তারিত বর্ণনা..."
+                                />
+                              </div>
+
+                              {/* Questions Section */}
+                              <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                  <h4 className="font-semibold text-gray-700 flex items-center gap-2">
+                                    <FaListOl className="text-blue-600" />
+                                    প্রশ্নসমূহ ({lesson.exam.questions.length}টি)
+                                  </h4>
+                                  <button
+                                    type="button"
+                                    onClick={() => addQuestionToExam(cIndex, lIndex)}
+                                    className="flex items-center gap-2 bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600 transition-colors duration-200 text-sm"
+                                  >
+                                    <FaPlus className="text-xs" />
+                                    প্রশ্ন যোগ করুন
+                                  </button>
+                                </div>
+
+                                {/* Questions List */}
+                                {lesson.exam.questions.map((question, qIndex) => (
+                                  <div key={qIndex} className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+                                    <div className="flex justify-between items-start">
+                                      <span className="bg-blue-500 text-white px-2 py-1 rounded text-sm font-semibold">
+                                        প্রশ্ন {qIndex + 1}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => removeQuestionFromExam(cIndex, lIndex, qIndex)}
+                                        className="p-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors duration-200"
+                                        disabled={lesson.exam.questions.length <= 1}
+                                      >
+                                        <FaTrash className="text-xs" />
+                                      </button>
+                                    </div>
+
+                                    {/* Question Text */}
+                                    <div className="space-y-2">
+                                      <label className="block text-sm font-medium text-gray-700">
+                                        প্রশ্ন লিখুন
+                                      </label>
+                                      <textarea
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        value={question.question_text}
+                                        onChange={(e) => updateExamQuestion(cIndex, lIndex, qIndex, 'question_text', e.target.value)}
+                                        placeholder="প্রশ্নটি লিখুন..."
+                                        rows="2"
+                                      />
+                                    </div>
+
+                                    {/* Options */}
+                                    <div className="space-y-2">
+                                      <label className="block text-sm font-medium text-gray-700">
+                                        অপশনসমূহ
+                                      </label>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {question.options.map((option, optIndex) => (
+                                          <div key={optIndex} className="flex items-center gap-3">
+                                            <div className="flex items-center gap-2 flex-1">
+                                              <span className="font-semibold text-gray-700 w-6">
+                                                {option.id}.
+                                              </span>
+                                              <input
+                                                type="text"
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                value={option.text}
+                                                onChange={(e) => updateOptionText(cIndex, lIndex, qIndex, optIndex, e.target.value)}
+                                                placeholder={`অপশন ${option.id} লিখুন...`}
+                                              />
+                                            </div>
+                                            <input
+                                              type="radio"
+                                              name={`correct-${cIndex}-${lIndex}-${qIndex}`}
+                                              value={option.id}
+                                              checked={question.correct_answer === option.id}
+                                              onChange={(e) => updateExamQuestion(cIndex, lIndex, qIndex, 'correct_answer', e.target.value)}
+                                              className="w-4 h-4 text-blue-600"
+                                            />
+                                            <span className="text-sm text-gray-500">সঠিক</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* Marks */}
+                                    <div className="space-y-2">
+                                      <label className="block text-sm font-medium text-gray-700">
+                                        মার্ক
+                                      </label>
+                                      <input
+                                        type="number"
+                                        className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        value={question.marks}
+                                        onChange={(e) => updateExamQuestion(cIndex, lIndex, qIndex, 'marks', parseInt(e.target.value))}
+                                        min="1"
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}

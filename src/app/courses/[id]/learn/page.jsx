@@ -4,11 +4,12 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import { IoPauseCircleOutline, IoPlayCircleOutline, IoVolumeHighOutline, IoVolumeMuteOutline } from "react-icons/io5";
 import { MdFullscreen, MdOutlineFullscreenExit } from "react-icons/md";
 import { RiForward10Line, RiReplay10Line } from "react-icons/ri";
-import { ChevronDown, ChevronUp, Loader2, PlayCircle } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, PlayCircle, BookOpen, ArrowRight, ArrowLeft, CheckCircle } from "lucide-react";
 import useAxiosSecure from "@/hooks/useAxiosSecure";
+import Link from "next/link";
 
 // Video Player Component
-const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDurationChange }) => {
+const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDurationChange, onVideoEnd }) => {
   const containerRef = useRef(null);
   const hideTimeoutRef = useRef(null);
   const playerRef = useRef(null);
@@ -29,6 +30,7 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
   const [error, setError] = useState(null);
   const [playerReady, setPlayerReady] = useState(false);
   const [showCenterPlay, setShowCenterPlay] = useState(false);
+  const [isSeeking, setIsSeeking] = useState(false);
 
   const playbackRates = [2.0, 1.75, 1.5, 1.25, 1.0, 0.75, 0.5];
   const availableQualities = ['hd1080', 'hd720', 'large', 'medium', 'small', 'auto'];
@@ -131,13 +133,13 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
     setShowControls(true);
     setShowCenterPlay(false);
     
-    if (isPlaying && !showSpeedMenu && !showResolutionMenu && !showVolumeSlider) {
+    if (isPlaying && !showSpeedMenu && !showResolutionMenu && !showVolumeSlider && !isSeeking) {
       hideTimeoutRef.current = setTimeout(() => {
         setShowControls(false);
         setShowCenterPlay(true);
       }, 2000);
     }
-  }, [isPlaying, showSpeedMenu, showResolutionMenu, showVolumeSlider]);
+  }, [isPlaying, showSpeedMenu, showResolutionMenu, showVolumeSlider, isSeeking]);
 
   // Format time to MM:SS
   const formatTime = (seconds) => {
@@ -170,15 +172,19 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
 
     switch (event.data) {
       case window.YT.PlayerState.PLAYING:
+        setIsLoading(false);
         resetHideTimeout();
         break;
       case window.YT.PlayerState.PAUSED:
         setShowControls(true);
         setShowCenterPlay(true);
+        setIsLoading(false);
         break;
       case window.YT.PlayerState.ENDED:
         setShowControls(true);
         setShowCenterPlay(true);
+        setIsLoading(false);
+        onVideoEnd?.();
         break;
       case window.YT.PlayerState.BUFFERING:
         setIsLoading(true);
@@ -190,7 +196,7 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
         setIsLoading(false);
         break;
     }
-  }, [resetHideTimeout]);
+  }, [resetHideTimeout, onVideoEnd]);
 
   const onPlayerError = useCallback((event) => {
     console.error('YouTube Player Error:', event.data);
@@ -213,7 +219,7 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
   // Update current time periodically when playing
   useEffect(() => {
     let interval;
-    if (playerReady && playerRef.current) {
+    if (playerReady && playerRef.current && isPlaying) {
       interval = setInterval(() => {
         try {
           if (playerRef.current && playerRef.current.getCurrentTime) {
@@ -224,13 +230,13 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
         } catch (error) {
           console.log('Error getting current time:', error);
         }
-      }, 500);
+      }, 100);
     }
     
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [playerReady, onTimeUpdate]);
+  }, [playerReady, isPlaying, onTimeUpdate]);
 
   // Load YouTube IFrame API
   useEffect(() => {
@@ -308,7 +314,7 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
         playerVars: {
           'playsinline': 1,
           'controls': 0,
-          'disablekb': 1,
+          'disablekb': 0,
           'modestbranding': 1,
           'rel': 0,
           'enablejsapi': 1,
@@ -345,9 +351,10 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
       const newTime = Math.max(0, Math.min(currentTime + seconds, duration));
       playerRef.current.seekTo(newTime, true);
       setCurrentTime(newTime);
+      onTimeUpdate(newTime);
     }
     resetHideTimeout();
-  }, [currentTime, duration, resetHideTimeout]);
+  }, [currentTime, duration, resetHideTimeout, onTimeUpdate]);
 
   // Player control functions
   const togglePlay = useCallback(() => {
@@ -371,9 +378,22 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
       
       playerRef.current.seekTo(newTime, true);
       setCurrentTime(newTime);
+      onTimeUpdate(newTime);
       resetHideTimeout();
     }
-  }, [duration, resetHideTimeout]);
+  }, [duration, resetHideTimeout, onTimeUpdate]);
+
+  const handleProgressDrag = useCallback((e) => {
+    if (playerRef.current && duration > 0) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const newTime = percent * duration;
+      
+      playerRef.current.seekTo(newTime, true);
+      setCurrentTime(newTime);
+      onTimeUpdate(newTime);
+    }
+  }, [duration, onTimeUpdate]);
 
   const handleRateChange = useCallback((rate) => {
     if (playerRef.current) {
@@ -455,15 +475,35 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
     }
   };
 
+  // Progress bar drag handlers
+  const handleProgressMouseDown = (e) => {
+    setIsSeeking(true);
+    handleProgressDrag(e);
+    
+    const handleMouseMove = (moveEvent) => {
+      handleProgressDrag(moveEvent);
+    };
+    
+    const handleMouseUp = () => {
+      setIsSeeking(false);
+      resetHideTimeout();
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
   // Calculate progress percentage
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   if (!videoId) {
     return (
-      <div className="w-full bg-black rounded-2xl flex items-center justify-center h-96">
-        <div className="text-white text-center">
-          <div className="text-2xl font-bold mb-2">❌ No video available</div>
-          <p className="opacity-90">Please select a lesson</p>
+      <div className="w-full bg-black rounded-2xl flex items-center justify-center h-48 sm:h-64 md:h-80 lg:h-96">
+        <div className="text-white text-center p-4">
+          <div className="text-xl sm:text-2xl font-bold mb-2">❌ No video available</div>
+          <p className="opacity-90 text-sm sm:text-base">Please select a lesson</p>
         </div>
       </div>
     );
@@ -481,15 +521,17 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
       onClick={togglePlay}
     >
       {/* Video Player */}
-      <div className={`relative bg-black ${isFullscreen ? 'h-screen' : 'h-80 sm:h-96 md:h-[450px] lg:h-[500px]'}`}>
+      <div className={`relative bg-black ${
+        isFullscreen ? 'h-screen' : 'h-48 sm:h-64 md:h-80 lg:h-96 xl:h-[500px]'
+      }`}>
         
         {/* YouTube Player Container */}
         <div id="youtube-player" className="w-full h-full rounded-2xl overflow-hidden">
           {isLoading && !error && (
             <div className="w-full h-full bg-gradient-to-br from-gray-900 to-black flex items-center justify-center rounded-2xl">
               <div className="text-center">
-                <div className="animate-spin h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p className="text-white text-lg font-medium">Loading video...</p>
+                <div className="animate-spin h-8 w-8 sm:h-12 sm:w-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-3 sm:mb-4"></div>
+                <p className="text-white text-sm sm:text-lg font-medium">Loading video...</p>
               </div>
             </div>
           )}
@@ -497,14 +539,14 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
 
         {/* Error Display */}
         {error && (
-          <div className="absolute inset-0 bg-gradient-to-br from-red-900/95 to-red-800/95 flex items-center justify-center p-6 rounded-2xl">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-900/95 to-red-800/95 flex items-center justify-center p-4 sm:p-6 rounded-2xl">
             <div className="text-center text-white">
-              <div className="text-5xl mb-4">🎬</div>
-              <h3 className="text-2xl font-bold mb-2">Playback Error</h3>
-              <p className="text-lg mb-6 opacity-90">{error}</p>
+              <div className="text-3xl sm:text-5xl mb-3 sm:mb-4">🎬</div>
+              <h3 className="text-lg sm:text-2xl font-bold mb-2">Playback Error</h3>
+              <p className="text-sm sm:text-lg mb-4 sm:mb-6 opacity-90">{error}</p>
               <button 
                 onClick={createPlayer}
-                className="px-6 py-3 bg-white text-red-700 rounded-xl font-semibold hover:bg-gray-100 transition-all duration-200 shadow-lg"
+                className="px-4 py-2 sm:px-6 sm:py-3 bg-white text-red-700 rounded-xl font-semibold hover:bg-gray-100 transition-all duration-200 shadow-lg text-sm sm:text-base"
               >
                 Try Again
               </button>
@@ -520,7 +562,7 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
                 e.stopPropagation();
                 togglePlay();
               }}
-              className="text-white text-6xl sm:text-8xl opacity-80 hover:opacity-100 hover:scale-110 transition-all duration-200"
+              className="text-white text-4xl sm:text-6xl lg:text-8xl opacity-80 hover:opacity-100 hover:scale-110 transition-all duration-200"
             >
               <IoPlayCircleOutline />
             </button>
@@ -534,38 +576,38 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
           }`}
         >
           {/* Top Controls Bar */}
-          <div className="absolute top-0 left-0 right-0 p-4">
-            {/* Video Title */}
-            <div className="text-white text-sm font-semibold truncate">
+          <div className="absolute top-0 left-0 right-0 p-3 sm:p-4">
+            <div className="text-white text-xs sm:text-sm font-semibold truncate">
               {videoUrl ? "Now Playing" : "Select a lesson"}
             </div>
           </div>
 
           {/* Bottom Controls Bar */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
+          <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 lg:p-6">
             
             {/* Progress Bar */}
-            <div className="mb-4 sm:mb-6">
+            <div className="mb-3 sm:mb-4 lg:mb-6">
               <div 
-                className="w-full h-2 bg-white/20 rounded-full cursor-pointer relative group/progress"
+                className="w-full h-1.5 sm:h-2 bg-white/20 rounded-full cursor-pointer relative group/progress"
                 onClick={handleProgressClick}
+                onMouseDown={handleProgressMouseDown}
               >
                 <div 
-                  className="absolute h-2 bg-white/30 rounded-full transition-all duration-200"
+                  className="absolute h-1.5 sm:h-2 bg-white/30 rounded-full transition-all duration-100"
                   style={{ width: `${progressPercentage}%` }}
                 ></div>
                 <div 
-                  className="absolute h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-200"
+                  className="absolute h-1.5 sm:h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-100"
                   style={{ width: `${progressPercentage}%` }}
                 ></div>
                 <div 
-                  className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg opacity-0 group-hover/progress:opacity-100 transition-opacity duration-200"
-                  style={{ left: `${progressPercentage}%`, marginLeft: '-8px' }}
+                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full shadow-lg opacity-0 group-hover/progress:opacity-100 transition-opacity duration-200"
+                  style={{ left: `${progressPercentage}%`, marginLeft: '-6px' }}
                 ></div>
               </div>
               
               {/* Time Display */}
-              <div className="flex justify-between text-white text-sm mt-2">
+              <div className="flex justify-between text-white text-xs sm:text-sm mt-1.5 sm:mt-2">
                 <span className="font-mono">{formatTime(currentTime)}</span>
                 <span className="font-mono">{formatTime(duration)}</span>
               </div>
@@ -575,7 +617,7 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
             <div className="flex items-center justify-between">
               
               {/* Left Controls */}
-              <div className="flex items-center space-x-4 sm:space-x-6">
+              <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4">
                 
                 {/* Play/Pause */}
                 <button
@@ -583,7 +625,7 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
                     e.stopPropagation();
                     togglePlay();
                   }}
-                  className="text-white text-2xl sm:text-3xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
+                  className="text-white text-xl sm:text-2xl lg:text-3xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
                 >
                   {isPlaying ? <IoPauseCircleOutline /> : <IoPlayCircleOutline />}
                 </button>
@@ -594,7 +636,7 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
                     e.stopPropagation();
                     skipBackward();
                   }}
-                  className="text-white text-xl sm:text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
+                  className="text-white text-lg sm:text-xl lg:text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
                 >
                   <RiReplay10Line />
                 </button>
@@ -605,55 +647,55 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
                     e.stopPropagation();
                     skipForward();
                   }}
-                  className="text-white text-xl sm:text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
+                  className="text-white text-lg sm:text-xl lg:text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
                 >
                   <RiForward10Line />
                 </button>
 
                 {/* Volume Control */}
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 sm:space-x-3">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleMute();
                     }}
-                    className="text-white text-xl sm:text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
+                    className="text-white text-lg sm:text-xl lg:text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
                   >
                     {getVolumeIcon()}
                   </button>
 
-                  {/* Volume Slider */}
-                  <div className="w-24 hidden sm:block">
+                  {/* Volume Slider - Hidden on mobile */}
+                  <div className="w-16 sm:w-20 lg:w-24 hidden sm:block">
                     <input
                       type="range"
                       min="0"
                       max="100"
                       value={volume}
                       onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
-                      className="w-full h-1 bg-white/30 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+                      className="w-full h-1 bg-white/30 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Right Controls */}
-              <div className="flex items-center space-x-4 sm:space-x-6">
+              <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4">
                 
-                {/* Playback Speed */}
-                <div className="relative">
+                {/* Playback Speed - Hidden on small mobile */}
+                <div className="relative hidden xs:block">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowSpeedMenu(!showSpeedMenu);
                       setShowResolutionMenu(false);
                     }}
-                    className="text-white text-sm sm:text-base font-semibold px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 transition-all duration-200"
+                    className="text-white text-xs sm:text-sm font-semibold px-2 py-1 sm:px-3 sm:py-1 rounded-lg bg-white/10 hover:bg-white/20 transition-all duration-200"
                   >
                     {playbackRate}x
                   </button>
 
                   {showSpeedMenu && (
-                    <div className="absolute bottom-full right-0 mb-2 w-32 bg-black/90 backdrop-blur-sm rounded-xl shadow-2xl border border-white/20 overflow-hidden z-10">
+                    <div className="absolute bottom-full right-0 mb-2 w-28 sm:w-32 bg-black/90 backdrop-blur-sm rounded-xl shadow-2xl border border-white/20 overflow-hidden z-10">
                       {playbackRates.map((rate) => (
                         <button
                           key={rate}
@@ -661,7 +703,7 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
                             e.stopPropagation();
                             handleRateChange(rate);
                           }}
-                          className={`block w-full py-3 px-4 text-left text-sm transition-all duration-200 ${
+                          className={`block w-full py-2 px-3 sm:py-3 sm:px-4 text-left text-xs sm:text-sm transition-all duration-200 ${
                             rate === playbackRate 
                               ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold' 
                               : 'text-white hover:bg-white/10'
@@ -674,21 +716,21 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
                   )}
                 </div>
 
-                {/* Quality Settings */}
-                <div className="relative">
+                {/* Quality Settings - Hidden on mobile */}
+                <div className="relative hidden sm:block">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowResolutionMenu(!showResolutionMenu);
                       setShowSpeedMenu(false);
                     }}
-                    className="text-white text-sm sm:text-base font-semibold px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 transition-all duration-200"
+                    className="text-white text-xs sm:text-sm font-semibold px-2 py-1 sm:px-3 sm:py-1 rounded-lg bg-white/10 hover:bg-white/20 transition-all duration-200"
                   >
                     {getQualityDisplayName(quality)}
                   </button>
 
                   {showResolutionMenu && (
-                    <div className="absolute bottom-full right-0 mb-2 w-32 bg-black/90 backdrop-blur-sm rounded-xl shadow-2xl border border-white/20 overflow-hidden z-10">
+                    <div className="absolute bottom-full right-0 mb-2 w-28 sm:w-32 bg-black/90 backdrop-blur-sm rounded-xl shadow-2xl border border-white/20 overflow-hidden z-10">
                       {availableQualities.map((q) => (
                         <button
                           key={q}
@@ -696,7 +738,7 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
                             e.stopPropagation();
                             handleQualityChange(q);
                           }}
-                          className={`block w-full py-3 px-4 text-left text-sm transition-all duration-200 ${
+                          className={`block w-full py-2 px-3 sm:py-3 sm:px-4 text-left text-xs sm:text-sm transition-all duration-200 ${
                             q === quality 
                               ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold' 
                               : 'text-white hover:bg-white/10'
@@ -715,7 +757,7 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
                     e.stopPropagation();
                     toggleFullscreen();
                   }}
-                  className="text-white text-xl sm:text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
+                  className="text-white text-lg sm:text-xl lg:text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
                 >
                   {isFullscreen ? <MdOutlineFullscreenExit /> : <MdFullscreen />}
                 </button>
@@ -724,6 +766,102 @@ const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDuratio
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+// Progress Bar Component
+const ProgressBar = ({ course, currentLesson, completedLessons }) => {
+  const totalLessons = course?.curriculum?.reduce((total, chapter) => total + chapter.lessons.length, 0) || 0;
+  const completedCount = completedLessons.length;
+  const progressPercentage = totalLessons > 0 ? (completedCount / totalLessons) * 100 : 0;
+
+  return (
+    <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-200">
+      <div className="flex items-center justify-between mb-3 sm:mb-4">
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900">Course Progress</h3>
+        <span className="text-sm font-medium text-blue-600">{Math.round(progressPercentage)}%</span>
+      </div>
+      
+      <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 mb-2">
+        <div 
+          className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 sm:h-3 rounded-full transition-all duration-500 ease-out"
+          style={{ width: `${progressPercentage}%` }}
+        ></div>
+      </div>
+      
+      <div className="flex justify-between text-xs sm:text-sm text-gray-600">
+        <span>{completedCount} of {totalLessons} lessons completed</span>
+        <span>{Math.round(progressPercentage)}%</span>
+      </div>
+    </div>
+  );
+};
+
+// Exam Progress Bar Component
+const ExamProgressBar = ({ course, currentLesson, completedExams }) => {
+  const totalExams = course?.curriculum?.reduce((total, chapter) => {
+    return total + chapter.lessons.filter(lesson => lesson.exam?.has_exam).length;
+  }, 0) || 0;
+
+  const completedExamCount = completedExams.length;
+  const examProgressPercentage = totalExams > 0 ? (completedExamCount / totalExams) * 100 : 0;
+
+  const currentLessonHasExam = currentLesson?.exam?.has_exam || false;
+  const isCurrentExamCompleted = completedExams.includes(currentLesson?.lesson_title);
+
+  return (
+    <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-200">
+      <div className="flex items-center justify-between mb-3 sm:mb-4">
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900">Exam Progress</h3>
+        <span className="text-sm font-medium text-green-600">{Math.round(examProgressPercentage)}%</span>
+      </div>
+      
+      <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 mb-2">
+        <div 
+          className="bg-gradient-to-r from-green-500 to-emerald-600 h-2 sm:h-3 rounded-full transition-all duration-500 ease-out"
+          style={{ width: `${examProgressPercentage}%` }}
+        ></div>
+      </div>
+      
+      <div className="flex justify-between text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
+        <span>{completedExamCount} of {totalExams} exams completed</span>
+        <span>{Math.round(examProgressPercentage)}%</span>
+      </div>
+
+      {/* Current Lesson Exam Status */}
+      {currentLessonHasExam && (
+        <div className={`p-3 rounded-lg border ${
+          isCurrentExamCompleted 
+            ? 'bg-green-50 border-green-200' 
+            : 'bg-orange-50 border-orange-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <BookOpen className={`w-4 h-4 ${
+                isCurrentExamCompleted ? 'text-green-600' : 'text-orange-600'
+              }`} />
+              <span className={`text-sm font-medium ${
+                isCurrentExamCompleted ? 'text-green-700' : 'text-orange-700'
+              }`}>
+                {currentLesson.exam.title}
+              </span>
+            </div>
+            <span className={`text-xs px-2 py-1 rounded-full ${
+              isCurrentExamCompleted 
+                ? 'bg-green-100 text-green-700' 
+                : 'bg-orange-100 text-orange-700'
+            }`}>
+              {isCurrentExamCompleted ? 'Completed' : 'Pending'}
+            </span>
+          </div>
+          {!isCurrentExamCompleted && (
+            <p className="text-xs text-orange-600 mt-1">
+              {currentLesson.exam.total_marks} marks • {currentLesson.exam.duration} mins
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -740,18 +878,41 @@ export default function LearnPage({ params }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [completedLessons, setCompletedLessons] = useState([]);
+  const [completedExams, setCompletedExams] = useState([]);
+  const [allLessons, setAllLessons] = useState([]); // Store all lessons in sequence
 
   useEffect(() => {
     const fetchCourse = async () => {
       try {
         const res = await axiosSecure.get(`/api/courses/${id}`);
         setCourse(res.data);
-        // Set the first lesson as default
         const firstLesson = res.data?.curriculum?.[0]?.lessons?.[0] || null;
         setCurrentLesson(firstLesson);
-        // Expand first chapter by default
         if (res.data?.curriculum?.length > 0) {
           setExpandedChapters([0]);
+        }
+        
+        // Extract all lessons in sequence for navigation
+        const lessonsSequence = [];
+        res.data?.curriculum?.forEach(chapter => {
+          chapter.lessons?.forEach(lesson => {
+            lessonsSequence.push({
+              ...lesson,
+              chapterTitle: chapter.chapter_title
+            });
+          });
+        });
+        setAllLessons(lessonsSequence);
+
+        const savedProgress = localStorage.getItem(`course-progress-${id}`);
+        const savedExamProgress = localStorage.getItem(`exam-progress-${id}`);
+        
+        if (savedProgress) {
+          setCompletedLessons(JSON.parse(savedProgress));
+        }
+        if (savedExamProgress) {
+          setCompletedExams(JSON.parse(savedExamProgress));
         }
       } catch (err) {
         console.error("❌ Error loading course:", err);
@@ -777,6 +938,53 @@ export default function LearnPage({ params }) {
     setDuration(newDuration);
   };
 
+  // Get current lesson index in the sequence
+  const getCurrentLessonIndex = useCallback(() => {
+    return allLessons.findIndex(lesson => 
+      lesson.lesson_title === currentLesson?.lesson_title
+    );
+  }, [currentLesson, allLessons]);
+
+  // Get next lesson in sequence
+  const getNextLesson = useCallback(() => {
+    const currentIndex = getCurrentLessonIndex();
+    if (currentIndex === -1 || currentIndex >= allLessons.length - 1) {
+      return null;
+    }
+    return allLessons[currentIndex + 1];
+  }, [getCurrentLessonIndex, allLessons]);
+
+  // Get previous lesson in sequence
+  const getPreviousLesson = useCallback(() => {
+    const currentIndex = getCurrentLessonIndex();
+    if (currentIndex <= 0) {
+      return null;
+    }
+    return allLessons[currentIndex - 1];
+  }, [getCurrentLessonIndex, allLessons]);
+
+  // Handle video end - Auto play next video and mark as completed
+  const handleVideoEnd = useCallback(() => {
+    if (currentLesson) {
+      // Mark current lesson as completed
+      if (!completedLessons.includes(currentLesson.lesson_title)) {
+        const updatedCompleted = [...completedLessons, currentLesson.lesson_title];
+        setCompletedLessons(updatedCompleted);
+        localStorage.setItem(`course-progress-${id}`, JSON.stringify(updatedCompleted));
+      }
+
+      // Auto play next lesson in sequence
+      const nextLesson = getNextLesson();
+      if (nextLesson) {
+        setTimeout(() => {
+          setCurrentLesson(nextLesson);
+          setIsPlaying(true);
+          setCurrentTime(0);
+        }, 1000); // 1 second delay before playing next video
+      }
+    }
+  }, [currentLesson, completedLessons, id, getNextLesson]);
+
   // Toggle chapter accordion
   const toggleChapter = (chapterIndex) => {
     setExpandedChapters((prev) =>
@@ -786,55 +994,57 @@ export default function LearnPage({ params }) {
     );
   };
 
-  // Handle lesson change
+  // Auto mark lesson as completed when changing lessons
+  const markLessonCompleted = useCallback((lessonTitle) => {
+    if (!completedLessons.includes(lessonTitle)) {
+      const updatedCompleted = [...completedLessons, lessonTitle];
+      setCompletedLessons(updatedCompleted);
+      localStorage.setItem(`course-progress-${id}`, JSON.stringify(updatedCompleted));
+      return true;
+    }
+    return false;
+  }, [completedLessons, id]);
+
+  // Handle lesson change with auto-completion
   const handleLessonChange = (lesson) => {
+    // Mark current lesson as completed before switching
+    if (currentLesson && !completedLessons.includes(currentLesson.lesson_title)) {
+      markLessonCompleted(currentLesson.lesson_title);
+    }
+    
     setCurrentLesson(lesson);
     setIsPlaying(true);
     setCurrentTime(0);
   };
 
-  // Get next/previous lessons
-  const getAdjacentLessons = () => {
-    if (!course?.curriculum) return { prev: null, next: null };
-
-    let prevLesson = null;
-    let nextLesson = null;
-    let found = false;
-
-    for (const chapter of course.curriculum) {
-      for (let i = 0; i < chapter.lessons.length; i++) {
-        if (chapter.lessons[i].lesson_title === currentLesson?.lesson_title) {
-          found = true;
-          // Previous lesson
-          if (i > 0) {
-            prevLesson = chapter.lessons[i - 1];
-          } else {
-            // Look in previous chapter
-            const chapterIndex = course.curriculum.indexOf(chapter);
-            if (chapterIndex > 0) {
-              const prevChapter = course.curriculum[chapterIndex - 1];
-              prevLesson = prevChapter.lessons[prevChapter.lessons.length - 1];
-            }
-          }
-          // Next lesson
-          if (i < chapter.lessons.length - 1) {
-            nextLesson = chapter.lessons[i + 1];
-          } else {
-            // Look in next chapter
-            const chapterIndex = course.curriculum.indexOf(chapter);
-            if (chapterIndex < course.curriculum.length - 1) {
-              const nextChapter = course.curriculum[chapterIndex + 1];
-              nextLesson = nextChapter.lessons[0];
-            }
-          }
-          break;
-        }
-      }
-      if (found) break;
+  // Handle next button click - goes to next lesson in sequence
+  const handleNextButtonClick = () => {
+    const nextLesson = getNextLesson();
+    if (nextLesson) {
+      handleLessonChange(nextLesson);
     }
-
-    return { prev: prevLesson, next: nextLesson };
   };
+
+  // Handle previous button click - goes to previous lesson in sequence
+  const handlePreviousButtonClick = () => {
+    const previousLesson = getPreviousLesson();
+    if (previousLesson) {
+      handleLessonChange(previousLesson);
+    }
+  };
+
+  // Mark exam as completed
+  const markExamCompleted = (lessonTitle) => {
+    if (!completedExams.includes(lessonTitle)) {
+      const updatedCompleted = [...completedExams, lessonTitle];
+      setCompletedExams(updatedCompleted);
+      localStorage.setItem(`exam-progress-${id}`, JSON.stringify(updatedCompleted));
+    }
+  };
+
+  // Get adjacent lessons for display
+  const previousLesson = getPreviousLesson();
+  const nextLesson = getNextLesson();
 
   if (loading) {
     return (
@@ -856,50 +1066,140 @@ export default function LearnPage({ params }) {
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-gray-50">
       {/* Left Section: Video Player */}
-      <div className="flex-1 p-4 lg:p-6">
+      <div className="flex-1 p-3 sm:p-4 lg:p-6">
         <VideoPlayer
           videoUrl={currentLesson?.video_url}
           isPlaying={isPlaying}
           onPlayPause={handlePlayPause}
           onTimeUpdate={handleTimeUpdate}
           onDurationChange={handleDurationChange}
+          onVideoEnd={handleVideoEnd}
         />
 
-        {/* Lesson Info */}
-        <div className="mt-6 bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {currentLesson?.lesson_title || "Select a Lesson"}
-          </h1>
-          <p className="text-gray-600 mb-4">{course.short_description}</p>
-          
-          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-            <div className="flex items-center space-x-2">
-              <PlayCircle className="w-4 h-4" />
-              <span>{currentLesson?.video_duration || "--:--"}</span>
+        {/* Lesson Info and Navigation */}
+        <div className="mt-4 sm:mt-6 space-y-4 sm:space-y-6">
+          {/* Lesson Info */}
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-200">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+                    {currentLesson?.lesson_title || "Select a Lesson"}
+                  </h1>
+                  {completedLessons.includes(currentLesson?.lesson_title) && (
+                    <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-500" />
+                  )}
+                </div>
+                <p className="text-gray-600 text-sm sm:text-base mb-3 sm:mb-4">{course.short_description}</p>
+                
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
+                  <div className="flex items-center space-x-1 sm:space-x-2">
+                    <PlayCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span>{currentLesson?.video_duration || "--:--"}</span>
+                  </div>
+                  <div className="flex items-center space-x-1 sm:space-x-2">
+                    <span>Instructor: {course.instructor_name}</span>
+                  </div>
+                  <div className="flex items-center space-x-1 sm:space-x-2">
+                    <span>Class: {course.class}</span>
+                  </div>
+                  <div className="flex items-center space-x-1 sm:space-x-2">
+                    <span>Subject: {course.subject}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Exam Button */}
+              {currentLesson?.exam?.has_exam ? (
+                <Link 
+                  href={{
+                    pathname: `/courses/${id}/exam`,
+                    query: { lesson: currentLesson.lesson_title }
+                  }}
+                  onClick={() => markExamCompleted(currentLesson.lesson_title)}
+                  className="flex items-center space-x-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold hover:opacity-90 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base mt-3 lg:mt-0"
+                >
+                  <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span>Take Exam</span>
+                </Link>
+              ) : (
+                <div className="flex items-center space-x-2 bg-gray-200 text-gray-500 px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold cursor-not-allowed text-sm sm:text-base mt-3 lg:mt-0">
+                  <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span>No Exam</span>
+                </div>
+              )}
             </div>
-            <div className="flex items-center space-x-2">
-              <span>Instructor: {course.instructor_name}</span>
+
+            {/* Navigation Buttons */}
+            <div className="flex items-center justify-between pt-3 sm:pt-4 border-t border-gray-200">
+              <button
+                onClick={handlePreviousButtonClick}
+                disabled={!previousLesson}
+                className={`flex items-center space-x-2 px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${
+                  previousLesson 
+                    ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span>Previous</span>
+              </button>
+
+              {/* Completion Status */}
+              <div className="flex items-center space-x-2">
+                {completedLessons.includes(currentLesson?.lesson_title) ? (
+                  <div className="flex items-center space-x-2 text-green-600 font-medium text-sm sm:text-base">
+                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>Completed</span>
+                  </div>
+                ) : (
+                  <div className="text-gray-500 text-xs sm:text-sm">
+                    Watch video to complete
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={handleNextButtonClick}
+                disabled={!nextLesson}
+                className={`flex items-center space-x-2 px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${
+                  nextLesson 
+                    ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                <span>Next</span>
+                <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
+              </button>
             </div>
-            <div className="flex items-center space-x-2">
-              <span>Class: {course.class}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span>Subject: {course.subject}</span>
-            </div>
+          </div>
+
+          {/* Progress Bars */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <ProgressBar 
+              course={course} 
+              currentLesson={currentLesson}
+              completedLessons={completedLessons}
+            />
+            <ExamProgressBar 
+              course={course} 
+              currentLesson={currentLesson}
+              completedExams={completedExams}
+            />
           </div>
         </div>
       </div>
 
       {/* Right Section: Lessons Sidebar */}
-      <div className="w-full lg:w-96 bg-white border-l border-gray-200 shadow-sm p-4 lg:p-6 overflow-y-auto max-h-screen">
-        <div className="sticky top-0 bg-white pb-4 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
+      <div className="w-full lg:w-80 xl:w-96 bg-white border-l border-gray-200 shadow-sm p-3 sm:p-4 lg:p-6 overflow-y-auto max-h-screen">
+        <div className="sticky top-0 bg-white pb-3 sm:pb-4 border-b border-gray-200">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">
             {course.title}
           </h2>
-          <p className="text-sm text-gray-600 mb-2">
+          <p className="text-xs sm:text-sm text-gray-600 mb-2">
             Instructor: <span className="font-semibold">{course.instructor_name}</span>
           </p>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+          <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs text-gray-500">
             <span>{course.total_videos} lessons</span>
             <span>•</span>
             <span className="flex items-center">
@@ -913,7 +1213,7 @@ export default function LearnPage({ params }) {
           </div>
         </div>
 
-        <div className="mt-4 space-y-3">
+        <div className="mt-3 sm:mt-4 space-y-2 sm:space-y-3">
           {course.curriculum?.map((chapter, chapterIndex) => (
             <div
               key={chapterIndex}
@@ -921,69 +1221,122 @@ export default function LearnPage({ params }) {
             >
               <button
                 onClick={() => toggleChapter(chapterIndex)}
-                className="w-full flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100 text-left transition-all duration-200"
+                className="w-full flex justify-between items-center p-3 sm:p-4 bg-gray-50 hover:bg-gray-100 text-left transition-all duration-200"
               >
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-semibold">
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs sm:text-sm font-semibold">
                     {chapterIndex + 1}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-sm">
+                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
                       {chapter.chapter_title}
                     </h3>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 mt-0.5">
                       {chapter.lessons?.length} lessons
                     </p>
                   </div>
                 </div>
                 {expandedChapters.includes(chapterIndex) ? (
-                  <ChevronUp size={18} className="text-gray-400" />
+                  <ChevronUp size={16} className="text-gray-400" />
                 ) : (
-                  <ChevronDown size={18} className="text-gray-400" />
+                  <ChevronDown size={16} className="text-gray-400" />
                 )}
               </button>
 
               {expandedChapters.includes(chapterIndex) && (
                 <div className="border-t border-gray-200">
-                  {chapter.lessons?.map((lesson, lessonIndex) => (
-                    <button
-                      key={lessonIndex}
-                      onClick={() => handleLessonChange(lesson)}
-                      className={`w-full flex items-center justify-between p-3 text-left transition-all duration-200 border-b border-gray-100 last:border-b-0 ${
-                        currentLesson?.lesson_title === lesson.lesson_title
-                          ? "bg-blue-50 border-l-4 border-l-blue-500"
-                          : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3 flex-1 min-w-0">
-                        <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                          currentLesson?.lesson_title === lesson.lesson_title
-                            ? "bg-blue-500 text-white"
-                            : "bg-gray-200 text-gray-600"
-                        }`}>
-                          {lessonIndex + 1}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium truncate ${
+                  {chapter.lessons?.map((lesson, lessonIndex) => {
+                    // Calculate the global lesson index for proper sequencing
+                    let globalIndex = 0;
+                    for (let i = 0; i < chapterIndex; i++) {
+                      globalIndex += course.curriculum[i].lessons.length;
+                    }
+                    globalIndex += lessonIndex;
+
+                    return (
+                      <div key={lessonIndex}>
+                        {/* Lesson Item */}
+                        <button
+                          onClick={() => handleLessonChange(lesson)}
+                          className={`w-full flex items-center justify-between p-2 sm:p-3 text-left transition-all duration-200 border-b border-gray-100 ${
                             currentLesson?.lesson_title === lesson.lesson_title
-                              ? "text-blue-700"
-                              : "text-gray-700"
-                          }`}>
-                            {lesson.lesson_title}
-                          </p>
-                          <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
-                            <PlayCircle className="w-3 h-3" />
-                            <span>{lesson.video_duration}</span>
+                              ? "bg-blue-50 border-l-4 border-l-blue-500"
+                              : "hover:bg-gray-50"
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                            <div className={`flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs ${
+                              currentLesson?.lesson_title === lesson.lesson_title
+                                ? "bg-blue-500 text-white"
+                                : completedLessons.includes(lesson.lesson_title)
+                                ? "bg-green-500 text-white"
+                                : "bg-gray-200 text-gray-600"
+                            }`}>
+                              {completedLessons.includes(lesson.lesson_title) ? '✓' : globalIndex + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-medium truncate ${
+                                currentLesson?.lesson_title === lesson.lesson_title
+                                  ? "text-blue-700"
+                                  : completedLessons.includes(lesson.lesson_title)
+                                  ? "text-green-700"
+                                  : "text-gray-700"
+                              }`}>
+                                {lesson.lesson_title}
+                              </p>
+                              <div className="flex items-center space-x-2 text-xs text-gray-500 mt-0.5">
+                                <PlayCircle className="w-3 h-3" />
+                                <span>{lesson.video_duration}</span>
+                                {completedLessons.includes(lesson.lesson_title) && (
+                                  <span className="text-green-500 font-medium">Completed</span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                          {currentLesson?.lesson_title === lesson.lesson_title && (
+                            <div className="flex-shrink-0">
+                              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                            </div>
+                          )}
+                        </button>
+
+                        {/* Exam Item - Displayed under each lesson */}
+                        {lesson.exam?.has_exam && (
+                          <div className={`px-2 sm:px-3 pb-2 sm:pb-3 border-b border-gray-100 last:border-b-0 ${
+                            currentLesson?.lesson_title === lesson.lesson_title ? "bg-blue-50" : "bg-gray-50"
+                          }`}>
+                            <Link 
+                              href={{
+                                pathname: `/courses/${id}/exam`,
+                                query: { lesson: lesson.lesson_title }
+                              }}
+                              onClick={() => markExamCompleted(lesson.lesson_title)}
+                              className={`flex items-center space-x-2 p-2 rounded-lg transition-all duration-200 ${
+                                completedExams.includes(lesson.lesson_title)
+                                  ? 'bg-green-100 text-green-700 border border-green-200'
+                                  : 'bg-yellow-100 text-yellow-700 border border-yellow-200 hover:bg-yellow-200'
+                              }`}
+                            >
+                              <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <div className="flex-1">
+                                <p className="text-xs sm:text-sm font-medium">
+                                  {lesson.exam.title}
+                                </p>
+                                <p className="text-xs text-opacity-80">
+                                  {completedExams.includes(lesson.lesson_title) ? 'Completed' : `${lesson.exam.total_marks} marks • ${lesson.exam.duration} mins`}
+                                </p>
+                              </div>
+                              {completedExams.includes(lesson.lesson_title) ? (
+                                <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
+                              ) : (
+                                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                              )}
+                            </Link>
+                          </div>
+                        )}
                       </div>
-                      {currentLesson?.lesson_title === lesson.lesson_title && (
-                        <div className="flex-shrink-0">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                        </div>
-                      )}
-                    </button>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
