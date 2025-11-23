@@ -3,8 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Star, PlayCircle, Clock, User, BookOpen, ArrowLeft, Video, CheckCircle } from "lucide-react";
 import Link from "next/link";
-import PaymentModal from "../Payment/PaymentModal";
-
+import PaymentModal from "@/app/Payment/PaymentModal";
 
 export default function CourseDetails({ params }) {
   const { id } = params;
@@ -101,42 +100,56 @@ export default function CourseDetails({ params }) {
     }
   };
 
- const handleStripePayment = async () => {
-  try {
-    setProcessingPayment(true);
-    
-    const response = await fetch('/api/create-payment-intent', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+  const handleStripePayment = async () => {
+    try {
+      console.log('Starting Stripe payment process...');
+      
+      // Prepare product data for Stripe Checkout
+      const productData = {
+        name: course.title,
+        description: course.short_description || "Online Course",
+        offerPrice: course.price,
+        image: course.thumbnail_url,
         courseId: id,
-        courseTitle: course.title,
-        price: course.price,
-        currency: 'bdt'
-      })
-    });
+        instructor: course.instructor_name
+      };
 
-    const data = await response.json();
+      console.log('Product data:', productData);
 
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to create payment');
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          product: productData
+        })
+      });
+
+      console.log('Checkout API response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Checkout API error response:', errorText);
+        throw new Error(`API error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('Checkout API success response:', result);
+
+      // NEW: Use the URL directly instead of redirectToCheckout
+      if (result.url) {
+        // Redirect directly to Stripe Checkout
+        window.location.href = result.url;
+      } else {
+        throw new Error('No checkout URL received from server');
+      }
+    } catch (error) {
+      console.error('Stripe payment error details:', error);
+      alert(`Payment failed: ${error.message}`);
+      throw error;
     }
-
-    if (data.clientSecret) {
-      // Redirect to real Stripe payment page
-      window.location.href = `/payment/stripe?client_secret=${data.clientSecret}&course_id=${id}`;
-    } else {
-      throw new Error('No client secret received');
-    }
-  } catch (error) {
-    console.error('Stripe payment error:', error);
-    alert(`Payment failed: ${error.message}`);
-    setProcessingPayment(false);
-    setShowPaymentModal(false);
-  }
-};
+  };
 
   const handleSSLCommerzPayment = async () => {
     try {
@@ -157,6 +170,8 @@ export default function CourseDetails({ params }) {
 
       if (data.GatewayPageURL) {
         window.location.href = data.GatewayPageURL;
+      } else {
+        throw new Error('No redirect URL received from SSLCommerz');
       }
     } catch (error) {
       throw error;

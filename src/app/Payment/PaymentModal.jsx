@@ -42,7 +42,7 @@ const PaymentModal = ({
   };
 
   return (
-    <div className="fixed inset-0  bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -55,6 +55,7 @@ const PaymentModal = ({
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            disabled={processingPayment}
           >
             <X className="w-5 h-5 text-gray-500" />
           </button>
@@ -99,12 +100,12 @@ const PaymentModal = ({
             {paymentMethods.map((method) => (
               <div
                 key={method.id}
-                onClick={() => setSelectedMethod(method.id)}
+                onClick={() => !processingPayment && setSelectedMethod(method.id)}
                 className={`border-2 rounded-xl p-4 cursor-pointer transition-all duration-200 ${
                   selectedMethod === method.id
                     ? "border-blue-500 bg-blue-50"
                     : "border-gray-200 hover:border-gray-300"
-                }`}
+                } ${processingPayment ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 bg-gradient-to-r ${method.colors} rounded-lg flex items-center justify-center`}>
