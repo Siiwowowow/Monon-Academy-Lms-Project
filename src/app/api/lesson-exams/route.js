@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import dbConnect, { collectionNameObj } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import dbConnect, { collectionNameObj } from '@/lib/dbConnect';
 
 // GET: লেসনের এক্সাম ফেচ করতে
 export async function GET(request) {

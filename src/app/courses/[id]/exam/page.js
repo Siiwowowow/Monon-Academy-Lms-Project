@@ -49,6 +49,51 @@ export default function ExamPage() {
   const [questionResults, setQuestionResults] = useState([]);
   const [activeTab, setActiveTab] = useState('results'); // 'results' or 'review'
 
+  // Calculate results function
+  const calculateResults = useCallback(() => {
+    const results = exam.questions.map((question, index) => {
+      const userAnswer = answers[index];
+      const isCorrect = userAnswer === question.correct_answer;
+      const correctOption = question.options.find(opt => opt.id === question.correct_answer);
+      
+      return {
+        question: question.question_text,
+        options: question.options,
+        userAnswer,
+        correctAnswer: question.correct_answer,
+        correctOptionText: correctOption?.text,
+        isCorrect,
+        marks: isCorrect ? (question.marks || 1) : 0
+      };
+    });
+
+    setQuestionResults(results);
+    return results;
+  }, [exam, answers]);
+
+  // handleFinishExam function with useCallback
+  const handleFinishExam = useCallback(() => {
+    setExamFinished(true);
+    setExamStarted(false);
+    
+    const results = calculateResults();
+    let calculatedScore = 0;
+    results.forEach(result => {
+      calculatedScore += result.marks;
+    });
+    
+    setScore(calculatedScore);
+    
+    // Mark exam as completed
+    const savedExamProgress = localStorage.getItem(`exam-progress-${courseId}`);
+    let updatedCompletedExams = savedExamProgress ? JSON.parse(savedExamProgress) : [];
+    if (!updatedCompletedExams.includes(lessonTitle)) {
+      updatedCompletedExams.push(lessonTitle);
+      localStorage.setItem(`exam-progress-${courseId}`, JSON.stringify(updatedCompletedExams));
+      setCompletedExams(updatedCompletedExams);
+    }
+  }, [calculateResults, courseId, lessonTitle]);
+
   useEffect(() => {
     const fetchCourseAndExam = async () => {
       try {
@@ -162,7 +207,7 @@ export default function ExamPage() {
     }
   }, [getPreviousLesson, courseId, router]);
 
-  // Timer effect
+  // Timer effect - FIXED: added handleFinishExam to dependencies
   useEffect(() => {
     let interval;
     if (examStarted && timeLeft > 0 && !examFinished) {
@@ -177,7 +222,7 @@ export default function ExamPage() {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [examStarted, timeLeft, examFinished]);
+  }, [examStarted, timeLeft, examFinished, handleFinishExam]);
 
   const startExam = () => {
     setExamStarted(true);
@@ -199,49 +244,6 @@ export default function ExamPage() {
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
-    }
-  };
-
-  const calculateResults = () => {
-    const results = exam.questions.map((question, index) => {
-      const userAnswer = answers[index];
-      const isCorrect = userAnswer === question.correct_answer;
-      const correctOption = question.options.find(opt => opt.id === question.correct_answer);
-      
-      return {
-        question: question.question_text,
-        options: question.options,
-        userAnswer,
-        correctAnswer: question.correct_answer,
-        correctOptionText: correctOption?.text,
-        isCorrect,
-        marks: isCorrect ? (question.marks || 1) : 0
-      };
-    });
-
-    setQuestionResults(results);
-    return results;
-  };
-
-  const handleFinishExam = () => {
-    setExamFinished(true);
-    setExamStarted(false);
-    
-    const results = calculateResults();
-    let calculatedScore = 0;
-    results.forEach(result => {
-      calculatedScore += result.marks;
-    });
-    
-    setScore(calculatedScore);
-    
-    // Mark exam as completed
-    const savedExamProgress = localStorage.getItem(`exam-progress-${courseId}`);
-    let updatedCompletedExams = savedExamProgress ? JSON.parse(savedExamProgress) : [];
-    if (!updatedCompletedExams.includes(lessonTitle)) {
-      updatedCompletedExams.push(lessonTitle);
-      localStorage.setItem(`exam-progress-${courseId}`, JSON.stringify(updatedCompletedExams));
-      setCompletedExams(updatedCompletedExams);
     }
   };
 

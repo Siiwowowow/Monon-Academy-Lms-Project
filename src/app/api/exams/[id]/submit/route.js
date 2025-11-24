@@ -1,17 +1,20 @@
 import { NextResponse } from 'next/server';
-import dbConnect, { collectionNameObj } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import dbConnect, { collectionNameObj } from '@/lib/dbConnect';
 
 export async function POST(request, { params }) {
   try {
-    const { id } = params;
+    // params কে await করুন
+    const { id } = await params;
     const { studentId, answers, timeSpent } = await request.json();
+
+    console.log('📝 Submit Data:', { studentId, answers, timeSpent });
 
     if (!studentId || !answers) {
       return NextResponse.json({ 
         success: false, 
         error: 'Student ID and answers are required' 
-      });
+      }, { status: 400 });
     }
 
     const examCollection = await dbConnect(collectionNameObj.examCollection);
@@ -34,23 +37,28 @@ export async function POST(request, { params }) {
       return NextResponse.json({ 
         success: false, 
         error: 'Invalid exam ID' 
-      });
+      }, { status: 400 });
     }
     
     if (!exam) {
       return NextResponse.json({ 
         success: false, 
         error: 'Exam not found' 
-      });
+      }, { status: 404 });
     }
 
-    // রেজাল্ট ক্যালকুলেট করুন
+    // রেজাল্ট ক্যালকুলেট করুন - FIXED LOGIC
     let obtainedMarks = 0;
     let correctAnswers = 0;
     let totalQuestions = exam.questions.length;
 
     const questionResults = exam.questions.map((question, index) => {
       const studentAnswer = answers[index];
+      
+      // Find the correct option object
+      const correctOption = question.options.find(opt => opt.id === question.correct_answer);
+      const studentSelectedOption = question.options.find(opt => opt.id === studentAnswer);
+      
       const isCorrect = studentAnswer === question.correct_answer;
       
       if (isCorrect) {
@@ -60,8 +68,11 @@ export async function POST(request, { params }) {
 
       return {
         question_text: question.question_text,
+        options: question.options,
         student_answer: studentAnswer,
+        student_answer_text: studentSelectedOption?.text || 'Not answered',
         correct_answer: question.correct_answer,
+        correct_answer_text: correctOption?.text || 'Not set',
         is_correct: isCorrect,
         marks: question.marks || 1,
         obtained_marks: isCorrect ? (question.marks || 1) : 0
@@ -69,7 +80,8 @@ export async function POST(request, { params }) {
     });
 
     // পাস/ফেল ডিটারমাইন করুন
-    const percentage = (obtainedMarks / exam.total_marks) * 100;
+    const totalMarks = exam.questions.reduce((sum, q) => sum + (q.marks || 1), 0);
+    const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
     const isPassed = obtainedMarks >= exam.passing_marks;
 
     // রেজাল্ট সেভ করুন
@@ -79,7 +91,7 @@ export async function POST(request, { params }) {
       course_id: exam.course_id,
       lesson_id: exam.lesson_id,
       obtained_marks: obtainedMarks,
-      total_marks: exam.total_marks,
+      total_marks: totalMarks,
       percentage: Math.round(percentage),
       is_passed: isPassed,
       correct_answers: correctAnswers,
@@ -95,7 +107,7 @@ export async function POST(request, { params }) {
       success: true,
       result: {
         obtained_marks: obtainedMarks,
-        total_marks: exam.total_marks,
+        total_marks: totalMarks,
         percentage: Math.round(percentage),
         is_passed: isPassed,
         correct_answers: correctAnswers,
@@ -111,6 +123,6 @@ export async function POST(request, { params }) {
     return NextResponse.json({ 
       success: false, 
       error: error.message 
-    });
+    }, { status: 500 });
   }
 }
