@@ -16,13 +16,10 @@ export default function Home() {
   return (
     <div>
       <HomeSLider/>
-      <Category/>
-      {/* <AdvancedCustomPlayer/> */}
-      
+      <Category/>     
       <FeaturedCourses/>
       <VideoPlayer/>
       <OfferBanner/>
-      
       <WhyChooseUs/>
       <TestimonialSection/>
       {/* <CallToAction/> */}

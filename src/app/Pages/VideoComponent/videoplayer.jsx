@@ -2,6 +2,8 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import { IoPauseCircleOutline, IoPlayCircleOutline, IoVolumeHighOutline, IoVolumeMuteOutline } from "react-icons/io5";
 import { MdFullscreen, MdOutlineFullscreenExit } from "react-icons/md";
 import { RiForward10Line, RiReplay10Line } from "react-icons/ri";
+import { FiSettings, FiCheck } from "react-icons/fi";
+import { BsPlayFill, BsPauseFill } from "react-icons/bs";
 
 const VideoPlayer = () => {
   const youtubeUrl = "https://www.youtube.com/watch?v=aqz-KE-bpKQ";
@@ -26,6 +28,7 @@ const VideoPlayer = () => {
   const [error, setError] = useState(null);
   const [playerReady, setPlayerReady] = useState(false);
   const [showCenterPlay, setShowCenterPlay] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const playbackRates = [2.0, 1.75, 1.5, 1.25, 1.0, 0.75, 0.5];
   const availableQualities = ['hd1080', 'hd720', 'large', 'medium', 'small', 'auto'];
@@ -126,14 +129,15 @@ const VideoPlayer = () => {
     
     setShowControls(true);
     setShowCenterPlay(false);
+    setShowSettings(false);
     
-    if (isPlaying && !showSpeedMenu && !showResolutionMenu && !showVolumeSlider) {
+    if (isPlaying && !showSpeedMenu && !showResolutionMenu && !showVolumeSlider && !showSettings) {
       hideTimeoutRef.current = setTimeout(() => {
         setShowControls(false);
         setShowCenterPlay(true);
       }, 2000);
     }
-  }, [isPlaying, showSpeedMenu, showResolutionMenu, showVolumeSlider]);
+  }, [isPlaying, showSpeedMenu, showResolutionMenu, showVolumeSlider, showSettings]);
 
   // Format time to MM:SS
   const formatTime = (seconds) => {
@@ -412,9 +416,9 @@ const VideoPlayer = () => {
 
   // Get volume icon
   const getVolumeIcon = () => {
-    if (volume === 0) return <IoVolumeMuteOutline />;
-    if (volume < 30) return <IoVolumeHighOutline />;
-    return <IoVolumeHighOutline />;
+    if (volume === 0) return <IoVolumeMuteOutline className="text-2xl" />;
+    if (volume < 30) return <IoVolumeHighOutline className="text-2xl" />;
+    return <IoVolumeHighOutline className="text-2xl" />;
   };
 
   // Get quality display name
@@ -460,94 +464,175 @@ const VideoPlayer = () => {
   }
 
   return (
-    <div 
-      ref={containerRef}
-      className={`mx-auto w-full bg-black shadow-2xl transition-all duration-300 select-none relative group ${
-        isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ' max-w-2xl'
-      }`}
-      onMouseEnter={handleContainerInteraction}
-      onMouseMove={handleContainerInteraction}
-      onMouseLeave={handleMouseLeave}
-      onClick={togglePlay}
-    >
-      {/* Video Player */}
-      <div className={`relative bg-black ${isFullscreen ? 'h-screen' : 'h-80 sm:h-96 md:h-[450px] lg:h-[450px]'}`}>
-        
-        {/* YouTube Player Container */}
-        <div id="youtube-player" className="w-full h-full  overflow-hidden">
-          {isLoading && !error && (
-            <div className="w-full h-full bg-gradient-to-br  flex items-center justify-center">
-              <div className="text-center">
-                <div className="animate-spin h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p className="text-white text-lg font-medium">Loading video...</p>
+    <div className="w-full">
+      {/* Player Container */}
+      <div 
+        ref={containerRef}
+        className={`relative bg-black shadow-2xl transition-all duration-300 select-none group mx-auto ${
+          isFullscreen ? 'fixed inset-0 z-50 h-screen' : 'max-w-6xl rounded-2xl overflow-hidden'
+        }`}
+        onMouseEnter={handleContainerInteraction}
+        onMouseMove={handleContainerInteraction}
+        onMouseLeave={handleMouseLeave}
+      >
+        {/* Video Player Area */}
+        <div className={`relative ${isFullscreen ? 'h-screen' : 'h-[500px] lg:h-[600px]'}`}>
+          
+          {/* YouTube Player Container */}
+          <div id="youtube-player" className="w-full h-full">
+            {isLoading && !error && (
+              <div className="w-full h-full bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin h-14 w-14 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                  <p className="text-white text-lg font-medium animate-pulse">Loading video...</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Error Display */}
+          {error && (
+            <div className="absolute inset-0 bg-gradient-to-br from-red-900/95 to-red-800/95 flex items-center justify-center p-6">
+              <div className="text-center text-white">
+                <div className="text-6xl mb-6">🎬</div>
+                <h3 className="text-3xl font-bold mb-3">Playback Error</h3>
+                <p className="text-xl mb-8 opacity-90 max-w-lg">{error}</p>
+                <button 
+                  onClick={createPlayer}
+                  className="px-8 py-4 bg-white text-red-700 rounded-xl font-semibold hover:bg-gray-100 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  Try Again
+                </button>
               </div>
             </div>
           )}
-        </div>
 
-        {/* Error Display */}
-        {error && (
-          <div className="absolute inset-0 bg-gradient-to-br from-red-900/95 to-red-800/95 flex items-center justify-center p-6 rounded-3xl">
-            <div className="text-center text-white">
-              <div className="text-5xl mb-4">🎬</div>
-              <h3 className="text-2xl font-bold mb-2">Playback Error</h3>
-              <p className="text-lg mb-6 opacity-90">{error}</p>
-              <button 
-                onClick={createPlayer}
-                className="px-6 py-3 bg-white text-red-700 rounded-xl font-semibold hover:bg-gray-100 transition-all duration-200 shadow-lg"
+          {/* Center Play Button */}
+          {showCenterPlay && !isPlaying && !error && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePlay();
+                }}
+                className="transform hover:scale-110 transition-all duration-300 bg-white/20 backdrop-blur-lg rounded-full p-6 hover:bg-white/30"
               >
-                Try Again
+                <BsPlayFill className="text-white text-6xl" />
+              </button>
+            </div>
+          )}
+
+          {/* Top Controls Bar */}
+          <div 
+            className={`absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 via-black/50 to-transparent transition-all duration-300 ${
+              showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-white text-lg font-semibold truncate max-w-md">
+                Video Player
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowSettings(!showSettings);
+                  setShowSpeedMenu(false);
+                  setShowResolutionMenu(false);
+                }}
+                className="text-white text-xl hover:text-blue-300 transition-all duration-200"
+              >
+                <FiSettings />
               </button>
             </div>
           </div>
-        )}
 
-        {/* Loading Overlay */}
-        
+          {/* Settings Menu */}
+          {showSettings && (
+            <div className="absolute top-16 right-4 bg-black/90 backdrop-blur-sm rounded-xl shadow-2xl border border-white/20 overflow-hidden z-20 w-48">
+              {/* Playback Speed */}
+              <div className="border-b border-white/10">
+                <div className="px-4 py-3 text-sm text-gray-300 font-medium">Playback Speed</div>
+                {playbackRates.map((rate) => (
+                  <button
+                    key={rate}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRateChange(rate);
+                    }}
+                    className={`flex items-center justify-between w-full py-3 px-4 text-left transition-all duration-200 ${
+                      rate === playbackRate 
+                        ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-blue-300' 
+                        : 'text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <span>{rate}x {rate === 1.0 && 'Normal'}</span>
+                    {rate === playbackRate && <FiCheck className="text-blue-400" />}
+                  </button>
+                ))}
+              </div>
 
-      
+              {/* Quality */}
+              <div>
+                <div className="px-4 py-3 text-sm text-gray-300 font-medium">Quality</div>
+                {availableQualities.map((q) => (
+                  <button
+                    key={q}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleQualityChange(q);
+                    }}
+                    className={`flex items-center justify-between w-full py-3 px-4 text-left transition-all duration-200 ${
+                      q === quality 
+                        ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-blue-300' 
+                        : 'text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <span>{getQualityDisplayName(q)}</span>
+                    {q === quality && <FiCheck className="text-blue-400" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-        {/* Controls Overlay */}
-        <div 
-          className={`absolute inset-0 bg-gradient-to-t  via-transparent to-transparent transition-all duration-300 ${
-            showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
-          }`}
-        >
           {/* Bottom Controls Bar */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
-            
+          <div 
+            className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent transition-all duration-300 ${
+              showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+          >
             {/* Progress Bar */}
-            <div className="mb-4 sm:mb-6">
+            <div className="px-4 pt-4">
               <div 
-                  className="w-full h-2 bg-white/20 rounded-full cursor-pointer relative group/progress"
+                className="w-full h-1.5 bg-white/20 rounded-full cursor-pointer relative group/progress"
                 onClick={handleProgressClick}
               >
                 <div 
-                  className="absolute h-2 bg-white/30 rounded-full transition-all duration-200"
+                  className="absolute h-1.5 bg-white/30 rounded-full transition-all duration-200"
                   style={{ width: `${progressPercentage}%` }}
                 ></div>
                 <div 
-                  className="absolute h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-200"
+                  className="absolute h-1.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-200"
                   style={{ width: `${progressPercentage}%` }}
                 ></div>
                 <div 
-                  className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg opacity-0 group-hover/progress:opacity-100 transition-opacity duration-200"
-                  style={{ left: `${progressPercentage}%`, marginLeft: '-8px' }}
+                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover/progress:opacity-100 transition-opacity duration-200"
+                  style={{ left: `${progressPercentage}%`, marginLeft: '-6px' }}
                 ></div>
               </div>
               
               {/* Time Display */}
-              <div className="flex justify-between text-white text-sm mt-2">
+              <div className="flex justify-between text-white text-sm mt-2 px-1">
                 <span className="font-mono">{formatTime(currentTime)}</span>
                 <span className="font-mono">{formatTime(duration)}</span>
               </div>
             </div>
 
-            {/* Control Buttons Row */}
-            <div className="flex items-center justify-between">
+            {/* Control Buttons */}
+            <div className="flex items-center justify-between px-4 pb-4 pt-2">
               
               {/* Left Controls */}
-              <div className="flex items-center space-x-4 sm:space-x-6">
+              <div className="flex items-center space-x-6">
                 
                 {/* Play/Pause */}
                 <button
@@ -555,32 +640,33 @@ const VideoPlayer = () => {
                     e.stopPropagation();
                     togglePlay();
                   }}
-                  className="text-white text-2xl sm:text-3xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
+                  className="text-white text-3xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
                 >
                   {isPlaying ? <IoPauseCircleOutline /> : <IoPlayCircleOutline />}
                 </button>
 
-                {/* Skip Backward */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    skipBackward();
-                  }}
-                  className="text-white text-xl sm:text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
-                >
-                  <RiReplay10Line />
-                </button>
+                {/* Skip Controls */}
+                <div className="flex items-center space-x-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      skipBackward();
+                    }}
+                    className="text-white text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
+                  >
+                    <RiReplay10Line />
+                  </button>
 
-                {/* Skip Forward */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    skipForward();
-                  }}
-                  className="text-white text-xl sm:text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
-                >
-                  <RiForward10Line />
-                </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      skipForward();
+                    }}
+                    className="text-white text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
+                  >
+                    <RiForward10Line />
+                  </button>
+                </div>
 
                 {/* Volume Control */}
                 <div className="flex items-center space-x-3">
@@ -589,13 +675,12 @@ const VideoPlayer = () => {
                       e.stopPropagation();
                       toggleMute();
                     }}
-                    className="text-white text-xl sm:text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
+                    className="text-white text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
                   >
                     {getVolumeIcon()}
                   </button>
 
-                  {/* Volume Slider */}
-                  <div className="w-24 hidden sm:block">
+                  <div className="w-24">
                     <input
                       type="range"
                       min="0"
@@ -609,76 +694,20 @@ const VideoPlayer = () => {
               </div>
 
               {/* Right Controls */}
-              <div className="flex items-center space-x-4 sm:space-x-6">
+              <div className="flex items-center space-x-6">
                 
-                {/* Playback Speed */}
-                <div className="relative">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowSpeedMenu(!showSpeedMenu);
-                      setShowResolutionMenu(false);
-                    }}
-                    className="text-white text-sm sm:text-base font-semibold px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 transition-all duration-200"
-                  >
-                    {playbackRate}x
-                  </button>
-
-                  {showSpeedMenu && (
-                    <div className="absolute bottom-full right-0 mb-2 w-32 bg-black/90 backdrop-blur-sm rounded-xl shadow-2xl border border-white/20 overflow-hidden z-10">
-                      {playbackRates.map((rate) => (
-                        <button
-                          key={rate}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRateChange(rate);
-                          }}
-                          className={`block w-full py-3 px-4 text-left text-sm transition-all duration-200 ${
-                            rate === playbackRate 
-                              ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold' 
-                              : 'text-white hover:bg-white/10'
-                          }`}
-                        >
-                          {rate}x {rate === 1.0 && 'Normal'}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                {/* Current Quality */}
+                <div className="hidden md:block">
+                  <span className="text-white text-sm bg-white/10 px-3 py-1.5 rounded-lg">
+                    {getQualityDisplayName(quality)}
+                  </span>
                 </div>
 
-                {/* Quality Settings */}
-                <div className="relative">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowResolutionMenu(!showResolutionMenu);
-                      setShowSpeedMenu(false);
-                    }}
-                    className="text-white text-sm sm:text-base font-semibold px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 transition-all duration-200"
-                  >
-                    {getQualityDisplayName(quality)}
-                  </button>
-
-                  {showResolutionMenu && (
-                    <div className="absolute bottom-full right-0 mb-2 w-32 bg-black/90 backdrop-blur-sm rounded-xl shadow-2xl border border-white/20 overflow-hidden z-10">
-                      {availableQualities.map((q) => (
-                        <button
-                          key={q}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleQualityChange(q);
-                          }}
-                          className={`block w-full py-3 px-4 text-left text-sm transition-all duration-200 ${
-                            q === quality 
-                              ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold' 
-                              : 'text-white hover:bg-white/10'
-                          }`}
-                        >
-                          {getQualityDisplayName(q)}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                {/* Current Speed */}
+                <div className="hidden md:block">
+                  <span className="text-white text-sm bg-white/10 px-3 py-1.5 rounded-lg">
+                    {playbackRate}x
+                  </span>
                 </div>
 
                 {/* Fullscreen Toggle */}
@@ -687,7 +716,7 @@ const VideoPlayer = () => {
                     e.stopPropagation();
                     toggleFullscreen();
                   }}
-                  className="text-white text-xl sm:text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
+                  className="text-white text-2xl hover:text-blue-300 transition-all duration-200 hover:scale-110"
                 >
                   {isFullscreen ? <MdOutlineFullscreenExit /> : <MdFullscreen />}
                 </button>
@@ -695,7 +724,11 @@ const VideoPlayer = () => {
             </div>
           </div>
         </div>
+       
       </div>
+
+     
+    
     </div>
   );
 };

@@ -15,17 +15,14 @@ import {
   FaCog,
   FaGraduationCap,
   FaBell,
-  FaSearch, // Though not used, keeping it as it was imported
+ 
 } from "react-icons/fa";
 import { GiTeacher } from "react-icons/gi";
 import { useState, useEffect, useContext, useRef } from "react";
 import { AuthContext } from "@/context/AuthContext";
 import toast from "react-hot-toast";
-import brandLogo from '../../../app/assets/logobrand.png';
-import Image from "next/image";
-
 // Define the custom active color
-const ACTIVE_COLOR = "#FFC400";
+const ACTIVE_COLOR = "#35556e";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -42,8 +39,7 @@ export default function Navbar() {
     { name: "Instructors", href: "/teachers", icon: <GiTeacher /> },
     { name: "Dashboard", href: "/dashboard", icon: <FaTachometerAlt />, authRequired: true }, // Added authRequired flag
     { name: "Contact", href: "/contact", icon: <FaPhoneAlt /> },
-    { name: "Community", href: "/community", icon: <FaInfoCircle /> }, // Capitalized for better appearance
-    // { name: "Video", href: "/video", icon: <FaInfoCircle />}, 
+    { name: "Community", href: "/community", icon: <FaInfoCircle /> }, // 
     
   ];
 
@@ -66,7 +62,6 @@ export default function Navbar() {
     }
   };
 
-  // --- Effects ---
   // 1. Scroll effect for navbar
   useEffect(() => {
     const handleScroll = () => {
@@ -106,8 +101,8 @@ export default function Navbar() {
         href={link.href}
         className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-medium transition-all duration-300 group ${
           pathname === link.href
-            ? "text-white shadow-lg shadow-amber-500/30"
-            : "text-gray-600 hover:bg-gray-100/50 hover:text-amber-600"
+            ? "text-white"
+            : "text-gray-600 hover:bg-gray-100/50 hover:text-[#35556e]"
         }`}
         style={pathname === link.href ? { backgroundColor: ACTIVE_COLOR, color: 'white' } : {}} // Apply active color
       >
@@ -127,8 +122,8 @@ export default function Navbar() {
         href={link.href}
         className={`flex items-center gap-4 p-4 rounded-2xl font-medium transition-all duration-300 ${
           pathname === link.href
-            ? "text-white shadow-lg shadow-amber-500/30"
-            : "text-gray-600 hover:bg-gray-100/50 hover:text-amber-600"
+            ? "text-white "
+            : "text-gray-600 hover:bg-gray-100/50 hover:text-[#35556e]"
         }`}
         style={pathname === link.href ? { backgroundColor: ACTIVE_COLOR, color: 'white' } : {}} // Apply active color
         onClick={() => setIsOpen(false)}
@@ -170,9 +165,9 @@ export default function Navbar() {
           
           <Link
             href="/"
-            className="btn btn-ghost text-xl font-bold hover:scale-105 transition-transform"
+            className="btn btn-ghost text-xl font-bold hover:scale-105 transition-transform text-[#35556e]"
           >
-            <Image src={brandLogo} alt="Brand Logo" className="w-20 h-auto object-contain" priority />
+            <h1>Course Master</h1>
           </Link>
         </div>
 
@@ -187,19 +182,11 @@ export default function Navbar() {
 
         {/* ======================= Navbar End (Desktop/Mobile Actions) ======================= */}
         <div className="navbar-end gap-3 flex items-center">
-          
-          {user && (
-            // Search Button for All
-            <button className="btn btn-ghost btn-circle text-gray-600 hover:text-blue-600 hover:bg-gray-100/50 rounded-2xl">
-              <FaSearch className="text-lg" />
-            </button>
-          )}
-
           {/* User Actions (Desktop) */}
           {user ? (
             <>
               {/* Desktop Notifications (Hidden on mobile) */}
-              <button className="btn btn-ghost btn-circle relative text-gray-600 hover:text-blue-600 hover:bg-gray-100/50 rounded-2xl hidden lg:block">
+              <button className="btn  border relative text-gray-600 hover:text-blue-600 hover:bg-gray-100/50 rounded-2xl hidden lg:block">
                 <FaBell className="text-lg" />
                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
               </button>
@@ -350,14 +337,14 @@ export default function Navbar() {
             <div className="hidden lg:flex items-center gap-2">
               <Link
                 href="/login"
-                className="btn btn-ghost text-gray-600 hover:text-amber-600 hover:bg-gray-100/50 rounded-2xl font-medium transition-all"
+                className="btn btn-ghost text-[#35556e]   hover:bg-gray-100/50 rounded-2xl font-medium transition-all"
               >
                 <FaSignInAlt className="mr-2" />
                 Login
               </Link>
               <Link
                 href="/signUp"
-                className="btn text-white hover:opacity-90 rounded-2xl font-medium shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all"
+                className="btn text-white  rounded-2xl font-medium  transition-all"
                 style={{ backgroundColor: ACTIVE_COLOR }}
               >
                 <FaUserPlus className="mr-2" />
@@ -396,12 +383,12 @@ export default function Navbar() {
         <div className="flex items-center justify-between p-6 border-b border-gray-100/50">
           <Link
             href="/"
-            className="text-2xl font-bold bg-clip-text text-transparent"
+            className="text-xl font-bold bg-clip-text text-transparent"
             onClick={() => setIsOpen(false)}
-            style={{ backgroundImage: `linear-gradient(to right, ${ACTIVE_COLOR}, #FF8C00)` }}
+            style={{ backgroundImage: `linear-gradient(to right, ${ACTIVE_COLOR}` }}
           >
             <FaGraduationCap className="inline mr-2" style={{ color: ACTIVE_COLOR }} />
-            EduLMS
+            Course Master
           </Link>
           <button
             onClick={() => setIsOpen(false)}
@@ -482,7 +469,7 @@ export default function Navbar() {
               </Link>
               <Link
                 href="/signUp"
-                className="btn w-full text-white hover:opacity-90 rounded-2xl font-medium shadow-lg shadow-amber-500/25"
+                className="btn w-full text-white rounded-2xl font-medium"
                 style={{ backgroundColor: ACTIVE_COLOR }}
                 onClick={() => setIsOpen(false)}
               >

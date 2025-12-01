@@ -29,11 +29,7 @@ export default function Footer() {
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <div>
-                  <Image 
-                  src={brandLogo} 
-                  alt="Monon Academy Logo" 
-                  className="w-16 h-16 object-contain"
-                />
+                  <h1 className='text-2xl font-bold mb-3'>Course Master</h1>
                   <p className="text-sm text-gray-600 leading-relaxed max-w-md">
                     বাংলাদেশের শিক্ষার্থীদের জন্য বিশ্বস্ত অনলাইন শিক্ষা প্ল্যাটফর্ম। 
                     <span className="block mt-1 text-blue-600 font-medium">
@@ -195,7 +191,7 @@ export default function Footer() {
         {/* Bottom Footer */}
         <div className="pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-center md:text-left text-sm text-gray-600">
-            © ২০২৫ <a href="/" className="text-blue-600 font-semibold hover:text-blue-700 transition-colors">মনন একাডেমি</a>. সকল অধিকার সংরক্ষিত
+            © ২০২৫ <a href="/" className="text-blue-600 font-semibold hover:text-blue-700 transition-colors">Course Master</a>. সকল অধিকার সংরক্ষিত
           </p>
           
           {/* Legal Links */}
