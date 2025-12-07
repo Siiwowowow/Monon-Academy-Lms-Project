@@ -156,11 +156,8 @@ export default function DashboardSidebar({ open, setOpen }) {
       icon: <FaUser className="text-gray-600 text-sm" />,
       links: [
         { href: "/", label: "Home", icon: <FaHome /> },
-        { href: "/dashboard/user/overview", label: "Overview", icon: <FaChartLine /> },
         { href: "/dashboard/user/profile", label: "Profile", icon: <FaUser /> },
-        { href: "/dashboard/user/enroll", label: "Enroll", icon: <FaBook /> },
-        { href: "/dashboard/user/progress", label: "Progress", icon: <FaRegClipboard /> },
-        { href: "/dashboard/user/settings", label: "Settings", icon: <FaCog /> },
+        { href: "/dashboard/user/overview", label: "Overview", icon: <FaChartLine /> },
       ],
     },
   };

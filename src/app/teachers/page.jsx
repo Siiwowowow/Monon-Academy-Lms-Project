@@ -8,7 +8,6 @@ import IMG1 from '../../app/assets/teachers/teacher1.png';
 import IMG2 from '../../app/assets/teachers/teacher2.png';
 import IMG3 from '../../app/assets/teachers/teacher3.png';
 import IMG4 from '../../app/assets/teachers/teacher4.png';
-import PrivateRoute from '@/hooks/PrivateRoute';
 
 // 🆓 Import Bangla font from Google Fonts
 const banglaFont = Tiro_Bangla({
@@ -86,7 +85,7 @@ export default function Teachers() {
   ];
 
   return (
-    <PrivateRoute>
+    
 
     <section className={`${banglaFont.className} max-w-7xl mx-auto px-4 py-16`}>
       {/* 🌟 Section Heading */}
@@ -146,6 +145,6 @@ export default function Teachers() {
         ))}
       </div>
     </section>
-    </PrivateRoute>
+    
   );
 }

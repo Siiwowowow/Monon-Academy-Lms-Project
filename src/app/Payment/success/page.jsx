@@ -1,33 +1,43 @@
+// app/Payment/success/page.jsx
 "use client";
 
-import React, { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { CheckCircle, BookOpen, ArrowRight, Mail, Home, AlertCircle, Database, RefreshCw } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { CheckCircle, BookOpen, ArrowRight, AlertCircle, Database, RefreshCw, UserCheck } from 'lucide-react';
 import Link from 'next/link';
 
-// Main content component that uses useSearchParams
-function PaymentSuccessContent() {
-  const searchParams = useSearchParams();
-  const sessionId = searchParams.get('session_id');
-  const courseId = searchParams.get('course_id');
-  
+export default function PaymentSuccess() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [enrollmentSuccess, setEnrollmentSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [course, setCourse] = useState(null);
   const [paymentData, setPaymentData] = useState(null);
+  const [roleUpdated, setRoleUpdated] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const [sessionId, setSessionId] = useState('');
+  const [courseId, setCourseId] = useState('');
 
   useEffect(() => {
-    if (sessionId && courseId) {
-      completeEnrollment();
-      fetchCourseDetails();
-    } else {
-      setError('Missing session ID or course ID');
-      setLoading(false);
+    // Get query parameters from URL
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const session = params.get('session_id');
+      const course = params.get('course_id');
+      
+      if (session && course) {
+        setSessionId(session);
+        setCourseId(course);
+        completeEnrollment(session, course);
+        fetchCourseDetails(course);
+      } else {
+        setError('Missing session ID or course ID');
+        setLoading(false);
+      }
     }
-  }, [sessionId, courseId]);
+  }, []);
 
-  const fetchCourseDetails = async () => {
+  const fetchCourseDetails = async (courseId) => {
     try {
       const response = await fetch(`/api/courses/${courseId}`);
       if (response.ok) {
@@ -39,7 +49,52 @@ function PaymentSuccessContent() {
     }
   };
 
-  const completeEnrollment = async () => {
+  const updateUserRoleToStudent = async (email) => {
+    if (!email) return false;
+    
+    try {
+      console.log(`Attempting to update role for: ${email}`);
+      
+      // Check current role
+      const roleRes = await fetch(`/api/users/role?email=${email}`);
+      if (!roleRes.ok) {
+        console.error('Failed to check user role');
+        return false;
+      }
+      
+      const roleData = await roleRes.json();
+      console.log(`Current role for ${email}:`, roleData.role);
+      
+      // Only update if role is "user"
+      if (roleData.role === "user") {
+        // Call the role update API
+        const updateRes = await fetch('/api/update-role', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email,
+            paymentStatus: "success",
+            courseId: courseId,
+            sessionId: sessionId,
+            action: "auto"
+          })
+        });
+        
+        if (updateRes.ok) {
+          const updateData = await updateRes.json();
+          console.log('Role update response:', updateData);
+          return updateData.roleUpdated;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      return false;
+    }
+  };
+
+  const completeEnrollment = async (sessionId, courseId) => {
     try {
       console.log('Completing enrollment for course:', courseId, 'Session:', sessionId);
       
@@ -56,6 +111,16 @@ function PaymentSuccessContent() {
         if (verifyResponse.ok) {
           const verifyData = await verifyResponse.json();
           setPaymentData(verifyData.payment);
+          
+          // Store user email for role update
+          if (verifyData.payment.userEmail) {
+            setUserEmail(verifyData.payment.userEmail);
+            
+            // Update role after verification
+            const roleUpdatedResult = await updateUserRoleToStudent(verifyData.payment.userEmail);
+            setRoleUpdated(roleUpdatedResult);
+          }
+          
           setEnrollmentSuccess(true);
           console.log('Payment already exists in database:', verifyData.payment);
           setLoading(false);
@@ -65,7 +130,7 @@ function PaymentSuccessContent() {
         console.log('Verify payment failed, continuing with enrollment...');
       }
 
-      // Create enrollment WITHOUT authentication
+      // Create enrollment
       const response = await fetch('/api/enroll', {
         method: 'POST',
         headers: {
@@ -86,6 +151,21 @@ function PaymentSuccessContent() {
       if (response.ok) {
         setEnrollmentSuccess(true);
         setPaymentData(data);
+        
+        // Update role after successful enrollment
+        if (data.userEmail) {
+          setUserEmail(data.userEmail);
+          
+          // Check if role was already updated by the enrollment API
+          if (data.roleUpdated) {
+            setRoleUpdated(true);
+          } else {
+            // Manually update role
+            const roleUpdatedResult = await updateUserRoleToStudent(data.userEmail);
+            setRoleUpdated(roleUpdatedResult);
+          }
+        }
+        
         console.log('Enrollment successful:', data);
       } else {
         console.error('Enrollment failed:', data);
@@ -96,6 +176,14 @@ function PaymentSuccessContent() {
       setError('Network error during enrollment. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    if (sessionId && courseId) {
+      setLoading(true);
+      setError(null);
+      completeEnrollment(sessionId, courseId);
     }
   };
 
@@ -131,7 +219,7 @@ function PaymentSuccessContent() {
 
           <div className="space-y-3">
             <button 
-              onClick={completeEnrollment}
+              onClick={handleRetry}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               <RefreshCw className="w-5 h-5" />
@@ -192,6 +280,20 @@ function PaymentSuccessContent() {
             </div>
           )}
 
+          {/* Role Update Status */}
+          {roleUpdated && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center justify-center gap-2 text-blue-600 mb-2">
+                <UserCheck className="w-5 h-5" />
+                <span className="font-medium text-lg">🎉 Welcome Student!</span>
+              </div>
+              <p className="text-blue-700 text-sm">
+                Your account has been upgraded to <strong>Student</strong> status.
+                You now have access to all student features!
+              </p>
+            </div>
+          )}
+
           {/* Payment Details */}
           {paymentData && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
@@ -203,6 +305,11 @@ function PaymentSuccessContent() {
                 <p><strong>Payment ID:</strong> {paymentData.paymentId || paymentData.id}</p>
                 <p><strong>Transaction ID:</strong> {paymentData.transactionId}</p>
                 <p><strong>User Email:</strong> {paymentData.userEmail}</p>
+                <p><strong>User Role:</strong> 
+                  <span className={`ml-2 px-2 py-1 rounded text-xs ${roleUpdated ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+                    {roleUpdated ? 'Student' : (paymentData.userRole || 'User')}
+                  </span>
+                </p>
                 <p><strong>Status:</strong> {paymentData.status || 'completed'}</p>
                 <p><strong>Method:</strong> {paymentData.paymentMethod || 'stripe'}</p>
               </div>
@@ -246,26 +353,12 @@ function PaymentSuccessContent() {
             <p className="text-blue-800 text-sm">
               <strong>Payment Reference:</strong> {sessionId}
             </p>
+            <p className="text-blue-800 text-sm mt-1">
+              <strong>Course ID:</strong> {courseId}
+            </p>
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-// Main component with Suspense boundary
-export default function PaymentSuccess() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Payment Details</h2>
-          <p className="text-gray-600">Please wait while we process your information...</p>
-        </div>
-      </div>
-    }>
-      <PaymentSuccessContent />
-    </Suspense>
   );
 }

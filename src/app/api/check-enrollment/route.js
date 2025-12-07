@@ -1,4 +1,4 @@
-// pages/api/user-courses.js
+// app/api/check-enrollment>route.js
 import { NextResponse } from "next/server";
 import dbConnect, { collectionNameObj } from "@/lib/dbConnect";
 import { ObjectId } from "mongodb";

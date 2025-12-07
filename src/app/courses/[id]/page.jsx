@@ -1,18 +1,35 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Star, PlayCircle, Clock, User, BookOpen, ArrowLeft, Video, CheckCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Star, PlayCircle, Clock, User, BookOpen, ArrowLeft, Video, CheckCircle, LogIn } from "lucide-react";
 import Link from "next/link";
 import PaymentModal from "@/app/Payment/PaymentModal";
+import useAuth from "@/hooks/useAuth"; // Make sure you have this hook
 
 export default function CourseDetails({ params }) {
-  const { id } = params;
+  const router = useRouter();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
+  
+  // Get authentication status
+  const { user, loading: authLoading } = useAuth();
+  
+  // Extract id from params
+  const { id } = params;
+
+  useEffect(() => {
+    // Redirect to login if not authenticated
+    if (!authLoading && !user) {
+      // Don't redirect immediately, let user see the course first
+      // They'll be prompted to login when they try to enroll
+      console.log("User not authenticated");
+    }
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     if (!id) {
@@ -48,6 +65,12 @@ export default function CourseDetails({ params }) {
 
   // Payment handlers
   const handleEnrollClick = () => {
+    if (!user) {
+      // Redirect to login page
+      router.push(`/auth/login?redirect=/courses/${id}`);
+      return;
+    }
+    
     if (course.price === 0) {
       handleFreeEnrollment();
     } else {
@@ -56,6 +79,11 @@ export default function CourseDetails({ params }) {
   };
 
   const handleFreeEnrollment = async () => {
+    if (!user) {
+      router.push(`/auth/login?redirect=/courses/${id}`);
+      return;
+    }
+    
     setProcessingPayment(true);
     try {
       const response = await fetch('/api/enroll', {
@@ -66,7 +94,8 @@ export default function CourseDetails({ params }) {
         body: JSON.stringify({
           courseId: id,
           price: 0,
-          paymentMethod: 'free'
+          paymentMethod: 'free',
+          userEmail: user.email // Pass user email
         })
       });
 
@@ -84,6 +113,11 @@ export default function CourseDetails({ params }) {
   };
 
   const handlePaymentMethodSelect = async (method) => {
+    if (!user) {
+      router.push(`/auth/login?redirect=/courses/${id}`);
+      return;
+    }
+    
     setProcessingPayment(true);
     try {
       if (method === 'stripe') {
@@ -101,6 +135,11 @@ export default function CourseDetails({ params }) {
   };
 
   const handleStripePayment = async () => {
+    if (!user) {
+      router.push(`/auth/login?redirect=/courses/${id}`);
+      return;
+    }
+    
     try {
       console.log('Starting Stripe payment process...');
       
@@ -111,7 +150,8 @@ export default function CourseDetails({ params }) {
         offerPrice: course.price,
         image: course.thumbnail_url,
         courseId: id,
-        instructor: course.instructor_name
+        instructor: course.instructor_name,
+        userEmail: user.email // Include user email
       };
 
       console.log('Product data:', productData);
@@ -137,9 +177,8 @@ export default function CourseDetails({ params }) {
       const result = await response.json();
       console.log('Checkout API success response:', result);
 
-      // NEW: Use the URL directly instead of redirectToCheckout
+      // Redirect directly to Stripe Checkout
       if (result.url) {
-        // Redirect directly to Stripe Checkout
         window.location.href = result.url;
       } else {
         throw new Error('No checkout URL received from server');
@@ -152,6 +191,11 @@ export default function CourseDetails({ params }) {
   };
 
   const handleSSLCommerzPayment = async () => {
+    if (!user) {
+      router.push(`/auth/login?redirect=/courses/${id}`);
+      return;
+    }
+    
     try {
       const response = await fetch('/api/sslcommerz-init', {
         method: 'POST',
@@ -162,7 +206,8 @@ export default function CourseDetails({ params }) {
           courseId: id,
           courseTitle: course.title,
           price: course.price,
-          currency: 'BDT'
+          currency: 'BDT',
+          userEmail: user.email // Include user email
         })
       });
 
@@ -223,6 +268,18 @@ export default function CourseDetails({ params }) {
       </div>
     </div>
   );
+
+  // Auth Loading Component
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) return <LoadingSkeleton />;
   if (error || !course) return <ErrorState />;
@@ -479,32 +536,46 @@ export default function CourseDetails({ params }) {
                 {activeTab === "instructor" && <InstructorTab />}
               </div>
 
-              {/* Enroll Button */}
+              {/* Enroll Button - Now with proper auth check */}
               <div className="mt-8">
-                <button 
-                  onClick={handleEnrollClick}
-                  disabled={processingPayment}
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center gap-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <PlayCircle className="w-6 h-6" />
-                  {processingPayment ? 'প্রসেসিং...' : 
-                    course.price === 0 ? 'ফ্রি কোর্সে এনরোল করুন' : `এনরোল করুন - ৳ ${course.price}`
-                  }
-                </button>
+                {user ? (
+                  // User is logged in
+                  <button 
+                    onClick={handleEnrollClick}
+                    disabled={processingPayment}
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center gap-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <PlayCircle className="w-6 h-6" />
+                    {processingPayment ? 'প্রসেসিং...' : 
+                      course.price === 0 ? 'ফ্রি কোর্সে এনরোল করুন' : `এনরোল করুন - ৳ ${course.price}`
+                    }
+                  </button>
+                ) : (
+                  // User is not logged in
+                  <button 
+                    onClick={() => router.push(`/auth/login?redirect=/courses/${id}`)}
+                    className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center gap-3 text-lg"
+                  >
+                    <LogIn className="w-6 h-6" />
+                    লগইন করুন এবং এনরোল করুন
+                  </button>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Payment Modal */}
-      <PaymentModal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        course={course}
-        onPaymentMethodSelect={handlePaymentMethodSelect}
-        processingPayment={processingPayment}
-      />
+      {/* Payment Modal - Only show if user is logged in */}
+      {user && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          course={course}
+          onPaymentMethodSelect={handlePaymentMethodSelect}
+          processingPayment={processingPayment}
+        />
+      )}
     </>
   );
 }

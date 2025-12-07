@@ -1,3 +1,4 @@
+//api>verify-payment>route.js
 import { NextResponse } from "next/server";
 import dbConnect, { collectionNameObj } from "@/lib/dbConnect";
 

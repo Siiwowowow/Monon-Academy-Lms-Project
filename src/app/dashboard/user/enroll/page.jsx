@@ -95,9 +95,9 @@ export default function EnrolledCourses() {
         {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900">আমার এনরোল্ড কোর্সসমূহ</h1>
-          <p className="text-gray-600 mt-2">
+          {/* <p className="text-gray-600 mt-2">
             {user.displayName || user.email}, আপনার শিক্ষা যাত্রা অব্যাহত রাখুন
-          </p>
+          </p> */}
         </div>
 
         {/* Courses Grid */}

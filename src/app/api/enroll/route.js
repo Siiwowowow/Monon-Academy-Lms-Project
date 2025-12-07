@@ -1,3 +1,4 @@
+// app/api/enroll/route.js
 import { NextResponse } from "next/server";
 import dbConnect, { collectionNameObj } from "@/lib/dbConnect";
 import { ObjectId } from "mongodb";
@@ -36,12 +37,11 @@ export async function POST(req) {
 
     console.log('Looking for course with ID:', courseId);
     
-    // Try to find course by different ID formats
+    // Try to find course
     let course;
     try {
       course = await coursesCollection.findOne({ _id: new ObjectId(courseId) });
     } catch (error) {
-      console.log('Not an ObjectId, trying as string...');
       course = await coursesCollection.findOne({ _id: courseId });
     }
 
@@ -54,8 +54,6 @@ export async function POST(req) {
         ]
       });
     }
-
-    console.log('Course found:', course ? 'Yes' : 'No');
     
     if (!course) {
       return NextResponse.json(
@@ -77,7 +75,7 @@ export async function POST(req) {
       });
     }
 
-    // Get the most recent active user from database (for testing)
+    // Get the most recent active user from database
     let user = await usersCollection.findOne({ 
       status: "active" 
     }, {
@@ -92,7 +90,7 @@ export async function POST(req) {
         name: "Payment User",
         email: `user_${sessionId.substring(0, 8)}@example.com`,
         status: "active",
-        role: "student",
+        role: "user", // Default role
         createdAt: new Date(),
         updatedAt: new Date(),
         lastLogin: new Date()
@@ -105,13 +103,40 @@ export async function POST(req) {
       console.log('Using existing user:', user.email);
     }
 
+    // ============ AUTOMATIC ROLE UPDATE ============
+    let roleUpdated = false;
+    
+    // Check if we should update role to student
+    if (status === "success" || status === "completed" || status === "paid") {
+      // Only update if current role is "user" or undefined
+      const currentRole = user.role || "user";
+      
+      if (currentRole === "user") {
+        // Update user role to student
+        await usersCollection.updateOne(
+          { _id: user._id },
+          { 
+            $set: { 
+              role: "student",
+              updatedAt: new Date()
+            }
+          }
+        );
+        roleUpdated = true;
+        console.log(`✅ User ${user.email} role updated from "user" to "student"`);
+      } else {
+        console.log(`⚠️ User ${user.email} already has role: "${currentRole}" - no update needed`);
+      }
+    }
+    // ============ END ROLE UPDATE ============
+
     // Generate transaction ID
     const transactionId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Create payment record with REAL user data
+    // Create payment record
     const paymentData = {
       sessionId,
-      transactionId: transactionId, // Add transaction ID
+      transactionId,
       courseId: course._id.toString(),
       courseTitle: course.title || "Unknown Course",
       courseInstructor: course.instructor_name || "Unknown Instructor",
@@ -123,13 +148,14 @@ export async function POST(req) {
       createdAt: new Date(),
       updatedAt: new Date(),
       
-      // REAL USER INFORMATION
-      userId: user._id.toString(), // Real user ID from database
-      userEmail: user.email, // Real user email from database
-      userName: user.name, // Real user name from database
+      // USER INFORMATION
+      userId: user._id.toString(),
+      userEmail: user.email,
+      userName: user.name,
       userPhotoURL: user.photoURL,
       userProvider: user.provider,
-      userRole: user.role,
+      userRole: roleUpdated ? "student" : (user.role || "user"), // Updated role
+      roleUpdated: roleUpdated, // Track if role was updated
       
       metadata: {
         stripeSessionId: sessionId,
@@ -137,7 +163,7 @@ export async function POST(req) {
         originalCourseId: courseId,
         userPhone: user.phone,
         userAddress: user.address,
-        isTemporaryUser: !user.lastLogin // Flag if this was a temporary user
+        isTemporaryUser: !user.lastLogin
       }
     };
 
@@ -145,7 +171,6 @@ export async function POST(req) {
     const result = await paymentCollection.insertOne(paymentData);
     
     console.log('Payment saved to database with ID:', result.insertedId);
-    console.log('Transaction ID:', transactionId);
     console.log('User email used:', user.email);
 
     // Update user's enrolled courses
@@ -185,6 +210,8 @@ export async function POST(req) {
       userId: user._id.toString(),
       userEmail: user.email,
       userName: user.name,
+      userRole: roleUpdated ? "student" : (user.role || "user"),
+      roleUpdated: roleUpdated,
       accessGranted: true,
       enrolledAt: new Date().toISOString()
     });
