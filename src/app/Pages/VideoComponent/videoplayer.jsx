@@ -464,7 +464,6 @@ const VideoPlayer = () => {
   }
 
   return (
-<<<<<<< HEAD
     <div 
       ref={containerRef}
       className={`mx-auto w-full shadow-2xl mb-8 rounded-4xl transition-all duration-300 select-none relative group ${
@@ -486,47 +485,6 @@ const VideoPlayer = () => {
               <div className="text-center">
                 <div className="animate-spin h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
                 <p className="text-white text-lg font-medium">Loading video...</p>
-=======
-    <div className="w-full">
-      {/* Player Container */}
-      <div 
-        ref={containerRef}
-        className={`relative bg-black shadow-2xl transition-all duration-300 select-none group mx-auto ${
-          isFullscreen ? 'fixed inset-0 z-50 h-screen' : 'max-w-6xl rounded-2xl overflow-hidden'
-        }`}
-        onMouseEnter={handleContainerInteraction}
-        onMouseMove={handleContainerInteraction}
-        onMouseLeave={handleMouseLeave}
-      >
-        {/* Video Player Area */}
-        <div className={`relative ${isFullscreen ? 'h-screen' : 'h-[500px] lg:h-[600px]'}`}>
-          
-          {/* YouTube Player Container */}
-          <div id="youtube-player" className="w-full h-full">
-            {isLoading && !error && (
-              <div className="w-full h-full bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
-                <div className="text-center">
-                  <div className="animate-spin h-14 w-14 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                  <p className="text-white text-lg font-medium animate-pulse">Loading video...</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Error Display */}
-          {error && (
-            <div className="absolute inset-0 bg-gradient-to-br from-red-900/95 to-red-800/95 flex items-center justify-center p-6">
-              <div className="text-center text-white">
-                <div className="text-6xl mb-6">🎬</div>
-                <h3 className="text-3xl font-bold mb-3">Playback Error</h3>
-                <p className="text-xl mb-8 opacity-90 max-w-lg">{error}</p>
-                <button 
-                  onClick={createPlayer}
-                  className="px-8 py-4 bg-white text-red-700 rounded-xl font-semibold hover:bg-gray-100 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-                >
-                  Try Again
-                </button>
->>>>>>> 1f8092dc2fb7b1b2fa1c001e680496553551d87b
               </div>
             </div>
           )}
