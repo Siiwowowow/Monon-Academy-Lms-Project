@@ -1,13 +1,67 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { Star, PlayCircle, Clock, User, BookOpen, ArrowLeft, Video, CheckCircle, LogIn } from "lucide-react";
 import Link from "next/link";
 import PaymentModal from "@/app/Payment/PaymentModal";
-import useAuth from "@/hooks/useAuth"; // Make sure you have this hook
+import useAuth from "@/hooks/useAuth";
 
+// Loading Skeleton Component (Moved outside)
+const LoadingSkeleton = () => (
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8 px-4">
+    <div className="max-w-6xl mx-auto">
+      <div className="animate-pulse">
+        <div className="h-6 bg-gray-300 rounded w-32 mb-6"></div>
+        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+          <div className="h-80 bg-gray-300"></div>
+          <div className="p-8">
+            <div className="h-8 bg-gray-300 rounded w-3/4 mb-4"></div>
+            <div className="h-4 bg-gray-300 rounded w-1/2 mb-8"></div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-20 bg-gray-200 rounded-lg"></div>
+              ))}
+            </div>
+            <div className="h-12 bg-gray-300 rounded-lg"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Error State Component
+const ErrorState = ({ error }) => (
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <div className="text-center max-w-md mx-4">
+      <div className="text-red-500 text-6xl mb-4">⚠️</div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-4">
+        {error || "Course not found"}
+      </h2>
+      <p className="text-gray-600 mb-6">
+        We couldn't find the course you're looking for. Please check the URL or browse our available courses.
+      </p>
+      <Link href="/courses">
+        <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-200 transform hover:scale-105">
+          Browse All Courses
+        </button>
+      </Link>
+    </div>
+  </div>
+);
+
+// Main component wrapped in Suspense
 export default function CourseDetails({ params }) {
+  return (
+    <Suspense fallback={<LoadingSkeleton />}>
+      <CourseDetailsContent params={params} />
+    </Suspense>
+  );
+}
+
+// Inner component that uses the params
+function CourseDetailsContent({ params }) {
   const router = useRouter();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,29 +73,48 @@ export default function CourseDetails({ params }) {
   // Get authentication status
   const { user, loading: authLoading } = useAuth();
   
-  // Extract id from params
-  const { id } = params;
+  // Extract id from params - Now properly handled
+  const [courseId, setCourseId] = useState(null);
+
+  useEffect(() => {
+    // Handle async params
+    const getParams = async () => {
+      try {
+        // In Next.js 15, params is a Promise
+        const resolvedParams = await Promise.resolve(params);
+        const id = resolvedParams?.id;
+        
+        if (!id) {
+          setError("Course ID not found");
+          setLoading(false);
+          return;
+        }
+        
+        setCourseId(id);
+      } catch (err) {
+        console.error("Error resolving params:", err);
+        setError("Failed to load course");
+        setLoading(false);
+      }
+    };
+    
+    getParams();
+  }, [params]);
 
   useEffect(() => {
     // Redirect to login if not authenticated
     if (!authLoading && !user) {
-      // Don't redirect immediately, let user see the course first
-      // They'll be prompted to login when they try to enroll
       console.log("User not authenticated");
     }
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    if (!id) {
-      setError("Course ID not found");
-      setLoading(false);
-      return;
-    }
+    if (!courseId) return;
 
     const fetchCourse = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/courses/${id}`);
+        const response = await fetch(`/api/courses/${courseId}`);
         
         if (!response.ok) {
           if (response.status === 404) {
@@ -61,13 +134,13 @@ export default function CourseDetails({ params }) {
     };
 
     fetchCourse();
-  }, [id]);
+  }, [courseId]);
 
   // Payment handlers
   const handleEnrollClick = () => {
     if (!user) {
       // Redirect to login page
-      router.push(`/auth/login?redirect=/courses/${id}`);
+      router.push(`/auth/login?redirect=/courses/${courseId}`);
       return;
     }
     
@@ -80,7 +153,7 @@ export default function CourseDetails({ params }) {
 
   const handleFreeEnrollment = async () => {
     if (!user) {
-      router.push(`/auth/login?redirect=/courses/${id}`);
+      router.push(`/auth/login?redirect=/courses/${courseId}`);
       return;
     }
     
@@ -92,7 +165,7 @@ export default function CourseDetails({ params }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          courseId: id,
+          courseId: courseId,
           price: 0,
           paymentMethod: 'free',
           userEmail: user.email // Pass user email
@@ -100,7 +173,7 @@ export default function CourseDetails({ params }) {
       });
 
       if (response.ok) {
-        window.location.href = `/courses/${id}/learn`;
+        window.location.href = `/courses/${courseId}/learn`;
       } else {
         throw new Error('Enrollment failed');
       }
@@ -114,7 +187,7 @@ export default function CourseDetails({ params }) {
 
   const handlePaymentMethodSelect = async (method) => {
     if (!user) {
-      router.push(`/auth/login?redirect=/courses/${id}`);
+      router.push(`/auth/login?redirect=/courses/${courseId}`);
       return;
     }
     
@@ -136,7 +209,7 @@ export default function CourseDetails({ params }) {
 
   const handleStripePayment = async () => {
     if (!user) {
-      router.push(`/auth/login?redirect=/courses/${id}`);
+      router.push(`/auth/login?redirect=/courses/${courseId}`);
       return;
     }
     
@@ -149,7 +222,7 @@ export default function CourseDetails({ params }) {
         description: course.short_description || "Online Course",
         offerPrice: course.price,
         image: course.thumbnail_url,
-        courseId: id,
+        courseId: courseId,
         instructor: course.instructor_name,
         userEmail: user.email // Include user email
       };
@@ -192,7 +265,7 @@ export default function CourseDetails({ params }) {
 
   const handleSSLCommerzPayment = async () => {
     if (!user) {
-      router.push(`/auth/login?redirect=/courses/${id}`);
+      router.push(`/auth/login?redirect=/courses/${courseId}`);
       return;
     }
     
@@ -203,7 +276,7 @@ export default function CourseDetails({ params }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          courseId: id,
+          courseId: courseId,
           courseTitle: course.title,
           price: course.price,
           currency: 'BDT',
@@ -223,52 +296,6 @@ export default function CourseDetails({ params }) {
     }
   };
 
-  // Loading Component
-  const LoadingSkeleton = () => (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8 px-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="animate-pulse">
-          <Link href="/courses">
-            <div className="h-6 bg-gray-300 rounded w-32 mb-6"></div>
-          </Link>
-          <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="h-80 bg-gray-300"></div>
-            <div className="p-8">
-              <div className="h-8 bg-gray-300 rounded w-3/4 mb-4"></div>
-              <div className="h-4 bg-gray-300 rounded w-1/2 mb-8"></div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-20 bg-gray-200 rounded-lg"></div>
-                ))}
-              </div>
-              <div className="h-12 bg-gray-300 rounded-lg"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Error Component
-  const ErrorState = () => (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      <div className="text-center max-w-md mx-4">
-        <div className="text-red-500 text-6xl mb-4">⚠️</div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          {error || "Course not found"}
-        </h2>
-        <p className="text-gray-600 mb-6">
-          We couldn't find the course you're looking for. Please check the URL or browse our available courses.
-        </p>
-        <Link href="/courses">
-          <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-200 transform hover:scale-105">
-            Browse All Courses
-          </button>
-        </Link>
-      </div>
-    </div>
-  );
-
   // Auth Loading Component
   if (authLoading) {
     return (
@@ -282,7 +309,7 @@ export default function CourseDetails({ params }) {
   }
 
   if (loading) return <LoadingSkeleton />;
-  if (error || !course) return <ErrorState />;
+  if (error || !course) return <ErrorState error={error} />;
 
   // Calculate total duration and lessons
   const totalDuration = course.curriculum?.reduce((total, chapter) => {
@@ -553,7 +580,7 @@ export default function CourseDetails({ params }) {
                 ) : (
                   // User is not logged in
                   <button 
-                    onClick={() => router.push(`/auth/login?redirect=/courses/${id}`)}
+                    onClick={() => router.push(`/auth/login?redirect=/courses/${courseId}`)}
                     className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center gap-3 text-lg"
                   >
                     <LogIn className="w-6 h-6" />

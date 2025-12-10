@@ -1,13 +1,11 @@
-// context/ChatContext.jsx
 "use client";
 
-import ChatModal from "@/app/shareComponent/ChatModal/ChatModal";
 import { createContext, useContext, useState } from "react";
-
+import ChatModal from "@/app/shareComponent/ChatModal/ChatModal";
 
 const ChatContext = createContext();
 
-export function ChatProvider({ children }) {
+export const ChatProvider = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const openChat = () => setIsOpen(true);
@@ -19,6 +17,6 @@ export function ChatProvider({ children }) {
       <ChatModal isOpen={isOpen} onClose={closeChat} />
     </ChatContext.Provider>
   );
-}
+};
 
 export const useChat = () => useContext(ChatContext);

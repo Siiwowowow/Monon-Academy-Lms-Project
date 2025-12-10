@@ -1,4 +1,4 @@
-// components/ChatButton.jsx
+// app/shareComponent/ChatModal/ChatButton.jsx
 "use client";
 
 import { FaComments } from "react-icons/fa";

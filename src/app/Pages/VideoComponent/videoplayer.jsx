@@ -462,8 +462,8 @@ const VideoPlayer = () => {
   return (
     <div 
       ref={containerRef}
-      className={`mx-auto w-full bg-black shadow-2xl transition-all duration-300 select-none relative group ${
-        isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ' max-w-2xl'
+      className={`mx-auto w-full shadow-2xl mb-8 rounded-4xl transition-all duration-300 select-none relative group ${
+        isFullscreen ? 'fixed inset-0 z-50' : ' max-w-4xl'
       }`}
       onMouseEnter={handleContainerInteraction}
       onMouseMove={handleContainerInteraction}
@@ -471,7 +471,8 @@ const VideoPlayer = () => {
       onClick={togglePlay}
     >
       {/* Video Player */}
-      <div className={`relative bg-black ${isFullscreen ? 'h-screen' : 'h-80 sm:h-96 md:h-[450px] lg:h-[450px]'}`}>
+      <h1> this is our over view </h1>
+      <div className={`relative bg-black ${isFullscreen ? 'h-screen' : 'h-80 sm:h-[300px] md:h-[450px] lg:h-[500px] '}`}>
         
         {/* YouTube Player Container */}
         <div id="youtube-player" className="w-full h-full  overflow-hidden">
