@@ -8,7 +8,7 @@ import { ChevronDown, ChevronUp, Loader2, PlayCircle, BookOpen, ArrowRight, Arro
 import useAxiosSecure from "@/hooks/useAxiosSecure";
 import Link from "next/link";
 
-// Video Player Component
+// Video Player Component (unchanged)
 const VideoPlayer = ({ videoUrl, isPlaying, onPlayPause, onTimeUpdate, onDurationChange, onVideoEnd }) => {
   const containerRef = useRef(null);
   const hideTimeoutRef = useRef(null);
@@ -868,7 +868,10 @@ const ExamProgressBar = ({ course, currentLesson, completedExams }) => {
 
 // Main Learn Component
 export default function LearnPage({ params }) {
-  const { id } = params;
+  // IMPORTANT: Unwrap the params promise using React.use()
+  const unwrappedParams = React.use(params);
+  const { id } = unwrappedParams; // Now you can safely access id
+
   const axiosSecure = useAxiosSecure();
 
   const [course, setCourse] = useState(null);
@@ -920,7 +923,11 @@ export default function LearnPage({ params }) {
         setLoading(false);
       }
     };
-    fetchCourse();
+    
+    // Only fetch if id is available
+    if (id) {
+      fetchCourse();
+    }
   }, [id, axiosSecure]);
 
   // Handle play/pause

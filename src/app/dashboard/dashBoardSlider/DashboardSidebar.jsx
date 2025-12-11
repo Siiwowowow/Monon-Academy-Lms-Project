@@ -143,9 +143,10 @@ export default function DashboardSidebar({ open, setOpen }) {
         { href: "/", label: "Home", icon: <FaHome /> },
         { href: "/dashboard/student/overview", label: "Dashboard", icon: <FaChartLine /> },
         { href: "/dashboard/student/my-courses", label: "My Courses", icon: <FaBook /> },
-        { href: "/dashboard/student/classes", label: "Classes", icon: <FaGraduationCap /> },
-        { href: "/dashboard/student/attendance", label: "Attendance", icon: <FaRegCalendarCheck /> },
+        { href: "/dashboard/student/exams", label: "Exams", icon: <FaGraduationCap /> },
+        
         { href: "/dashboard/student/assignments", label: "Assignments", icon: <FaTasks /> },
+        { href: "/dashboard/student/attendance", label: "Attendance", icon: <FaRegCalendarCheck /> },
         { href: "/dashboard/student/grades", label: "Grades", icon: <FaFileAlt /> },
         { href: "/dashboard/student/schedule", label: "Schedule", icon: <FaCalendarAlt /> },
         { href: "/dashboard/student/profile", label: "Profile", icon: <FaUser /> },

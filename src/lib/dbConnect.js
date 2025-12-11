@@ -1,33 +1,59 @@
 import { MongoClient, ServerApiVersion } from "mongodb";
 
 export const collectionNameObj = {
-    userCollection: "users",
-    coursesCollection: "courses",
-    examCollection: "exams",
-    videoCollection: "videos",
-    postsCollection: "posts",
-    paymentCollection: "payments",
+  userCollection: "users",
+  coursesCollection: "courses",
+  examCollection: "tests",
+  videoCollection: "videos",
+  postsCollection: "posts",
+  paymentCollection: "payments",
+  submissionCollection: "assignmentSubmit",
 };
 
 const uri = process.env.MONGODB_URI;
 const dbName = process.env.DB_NAME;
 
+if (!uri) {
+  throw new Error("❌ Please define MONGODB_URI in .env.local");
+}
+if (!dbName) {
+  throw new Error("❌ Please define DB_NAME in .env.local");
+}
+
 let client;
 let clientPromise;
 
-if (!process.env.MONGODB_URI) {
-  throw new Error("Please define MONGODB_URI in .env.local");
-}
+// ✅ Development Mode (Hot Reload Safe)
+if (process.env.NODE_ENV === "development") {
+  if (!global._mongoClientPromise) {
+    client = new MongoClient(uri, {
+      serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+      },
+    });
 
-if (!client) {
+    global._mongoClientPromise = client.connect();
+  }
+  clientPromise = global._mongoClientPromise;
+}
+// ✅ Production Mode
+else {
   client = new MongoClient(uri, {
-    serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
+    serverApi: {
+      version: ServerApiVersion.v1,
+      strict: true,
+      deprecationErrors: true,
+    },
   });
+
   clientPromise = client.connect();
 }
 
+// ✅ Main DB Connector
 export default async function dbConnect(collectionName) {
-  await clientPromise;
-  const db = client.db(dbName);
+  const connectedClient = await clientPromise; // ✅ FIX
+  const db = connectedClient.db(dbName);       // ✅ FIX
   return db.collection(collectionName);
 }
