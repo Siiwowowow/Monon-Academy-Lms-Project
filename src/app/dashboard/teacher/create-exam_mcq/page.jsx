@@ -1,18 +1,11 @@
-//src/app/dashboard/teacher/edit-exam/[id]/page.jsx
+//src/app/dashboard/teacher/create-exam_mcq/page.jsx
 'use client';
-import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { useState } from 'react';
 import useAuth from "@/hooks/useAuth";
 import useRole from "@/hooks/useRole";
 import { toast } from "react-hot-toast";
-import Link from 'next/link';
-import { FiArrowLeft, FiSave, FiTrash2, FiCopy, FiRefreshCw, FiEye } from 'react-icons/fi';
 
-export default function EditExam() {
-  const params = useParams();
-  const router = useRouter();
-  const examId = params.id;
-  
+export default function MCQExamForm() {
   const [formData, setFormData] = useState({
     examTitle: '',
     subject: '',
@@ -32,56 +25,8 @@ export default function EditExam() {
   });
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const { user } = useAuth();
   const { role } = useRole();
-
-  // Fetch exam data on component mount
-  useEffect(() => {
-    const fetchExamData = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/tests/mcq/${examId}`);
-        const data = await res.json();
-        
-        if (data.success) {
-          setFormData({
-            examTitle: data.exam.examTitle || '',
-            subject: data.exam.subject || '',
-            duration: data.exam.duration || 60,
-            totalMarks: data.exam.totalMarks || 100,
-            passingMarks: data.exam.passingMarks || 40,
-            instructions: data.exam.instructions || '',
-            questions: data.exam.questions || [
-              {
-                id: 1,
-                questionText: '',
-                options: ['', '', '', ''],
-                correctAnswer: 0,
-                marks: 1
-              }
-            ]
-          });
-          toast.success('Exam loaded successfully');
-        } else {
-          toast.error(data.message || 'Failed to load exam');
-          router.push('/dashboard/teacher/exams');
-        }
-      } catch (error) {
-        console.error('Error fetching exam:', error);
-        toast.error('Failed to load exam');
-        router.push('/dashboard/teacher/exams');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (examId) {
-      fetchExamData();
-    }
-  }, [examId, router]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -140,136 +85,60 @@ export default function EditExam() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    try {
-      const loadingToast = toast.loading("Updating MCQ Exam...");
+  // 🟩 Instructor Info Auto Add
+  const finalData = {
+    ...formData,
+    instructorName: user?.name || user?.displayName || "Unknown Instructor",
+    instructorEmail: user?.email || "",
+    instructorRole: role || "instructor",
+  };
 
-      const res = await fetch(`/api/tests/mcq/${examId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          updatedAt: new Date().toISOString(),
-          updatedBy: user?.email || "Unknown",
-          updatedByRole: role || "instructor"
-        }),
+  try {
+    const loadingToast = toast.loading("Creating MCQ Exam...");
+
+    const res = await fetch("/api/tests/mcq", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(finalData),
+    });
+
+    const data = await res.json();
+
+    toast.dismiss(loadingToast);
+
+    if (data.success) {
+      toast.success("MCQ Exam Created Successfully! 🎉");
+
+      // reset form
+      setFormData({
+        examTitle: "",
+        subject: "",
+        duration: 60,
+        totalMarks: 100,
+        passingMarks: 40,
+        instructions: "",
+        questions: [
+          {
+            id: 1,
+            questionText: "",
+            options: ["", "", "", ""],
+            correctAnswer: 0,
+            marks: 1,
+          },
+        ],
       });
-
-      const data = await res.json();
-      toast.dismiss(loadingToast);
-
-      if (data.success) {
-        toast.success("MCQ Exam Updated Successfully! 🎉");
-        router.push('/dashboard/teacher/exams');
-      } else {
-        toast.error(data.message || "Failed to update exam!");
-      }
-    } catch (error) {
-      console.error("Update Error:", error);
-      toast.error("Something went wrong!");
-    } finally {
-      setSaving(false);
+      setCurrentQuestion(0);
+    } else {
+      toast.error(data.message || "Failed to create exam!");
     }
-  };
-
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this exam? This action cannot be undone.')) {
-      return;
-    }
-
-    setDeleting(true);
-    try {
-      const loadingToast = toast.loading("Deleting Exam...");
-
-      const res = await fetch(`/api/tests/mcq/${examId}`, {
-        method: "DELETE",
-      });
-
-      const data = await res.json();
-      toast.dismiss(loadingToast);
-
-      if (data.success) {
-        toast.success("Exam Deleted Successfully!");
-        router.push('/dashboard/teacher/exams');
-      } else {
-        toast.error(data.message || "Failed to delete exam!");
-      }
-    } catch (error) {
-      console.error("Delete Error:", error);
-      toast.error("Something went wrong!");
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const handleDuplicate = async () => {
-    try {
-      const loadingToast = toast.loading("Duplicating Exam...");
-
-      // Create a copy of the current exam with new title
-      const duplicateData = {
-        ...formData,
-        examTitle: `${formData.examTitle} (Copy)`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        instructorName: user?.name || user?.displayName || "Unknown Instructor",
-        instructorEmail: user?.email || "",
-        instructorRole: role || "instructor",
-      };
-
-      const res = await fetch("/api/tests/mcq", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(duplicateData),
-      });
-
-      const data = await res.json();
-      toast.dismiss(loadingToast);
-
-      if (data.success) {
-        toast.success("Exam Duplicated Successfully!");
-        router.push(`/dashboard/teacher/edit-exam/${data.examId || data.data?._id}`);
-      } else {
-        toast.error(data.message || "Failed to duplicate exam!");
-      }
-    } catch (error) {
-      console.error("Duplicate Error:", error);
-      toast.error("Something went wrong!");
-    }
-  };
-
-  const handleReset = () => {
-    if (confirm('Are you sure you want to reset all changes?')) {
-      // Reload original data
-      fetch(`/api/tests/mcq/${examId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            setFormData({
-              examTitle: data.exam.examTitle || '',
-              subject: data.exam.subject || '',
-              duration: data.exam.duration || 60,
-              totalMarks: data.exam.totalMarks || 100,
-              passingMarks: data.exam.passingMarks || 40,
-              instructions: data.exam.instructions || '',
-              questions: data.exam.questions || [
-                {
-                  id: 1,
-                  questionText: '',
-                  options: ['', '', '', ''],
-                  correctAnswer: 0,
-                  marks: 1
-                }
-              ]
-            });
-            toast.success('Changes reset successfully');
-          }
-        });
-    }
-  };
+  } catch (error) {
+    console.error("Submit Error:", error);
+    toast.error("Something went wrong!");
+  }
+};
 
   const subjects = [
     'Mathematics',
@@ -282,78 +151,13 @@ export default function EditExam() {
     'Geography'
   ];
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading exam data...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-4xl mx-auto">
-        {/* Header with Actions */}
+        {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <Link 
-                href="/dashboard/teacher/exams"
-                className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition"
-              >
-                <FiArrowLeft className="w-5 h-5" />
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-800">Edit MCQ Exam</h1>
-                <p className="text-gray-600">Editing: {formData.examTitle || 'Untitled Exam'}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleDuplicate}
-                className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition flex items-center gap-2"
-                title="Duplicate Exam"
-              >
-                <FiCopy className="w-4 h-4" />
-                <span className="hidden sm:inline">Duplicate</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition flex items-center gap-2 disabled:opacity-50"
-                title="Delete Exam"
-              >
-                <FiTrash2 className="w-4 h-4" />
-                <span className="hidden sm:inline">{deleting ? 'Deleting...' : 'Delete'}</span>
-              </button>
-            </div>
-          </div>
-          
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Exam ID</p>
-                <p className="text-sm font-mono text-gray-800 truncate">{examId}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Created By</p>
-                <p className="text-sm font-medium">{user?.name || 'Unknown'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Your Role</p>
-                <p className="text-sm font-medium capitalize">{role}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Questions</p>
-                <p className="text-sm font-medium">{formData.questions.length}</p>
-              </div>
-            </div>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Create MCQ Exam</h1>
+          <p className="text-gray-600">Create and configure your multiple choice question exam</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6">
@@ -461,24 +265,13 @@ export default function EditExam() {
           <div className="mb-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-gray-700">Questions</h2>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition flex items-center gap-2"
-                  title="Reset Changes"
-                >
-                  <FiRefreshCw className="w-4 h-4" />
-                  <span className="hidden sm:inline">Reset</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={addQuestion}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
-                >
-                  <span>+ Add Question</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={addQuestion}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
+              >
+                <span>+ Add Question</span>
+              </button>
             </div>
 
             {/* Question Navigation */}
@@ -510,10 +303,9 @@ export default function EditExam() {
                     <button
                       type="button"
                       onClick={() => removeQuestion(qIndex)}
-                      className="px-3 py-1 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition flex items-center gap-2"
+                      className="px-3 py-1 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition"
                     >
-                      <FiTrash2 className="w-4 h-4" />
-                      Remove
+                      Remove Question
                     </button>
                   )}
                 </div>
@@ -571,8 +363,7 @@ export default function EditExam() {
                       className="w-24 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                     />
                   </div>
-                  <div className="bg-green-100 text-green-800 px-3 py-2 rounded-lg flex items-center gap-2">
-                    <FiEye className="w-4 h-4" />
+                  <div className="bg-green-100 text-green-800 px-3 py-2 rounded-lg">
                     Correct Answer: Option {String.fromCharCode(65 + q.correctAnswer)}
                   </div>
                 </div>
@@ -605,34 +396,38 @@ export default function EditExam() {
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex justify-between items-center">
-            <Link
-              href="/dashboard/teacher/exams"
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition flex items-center gap-2"
+          {/* Submit Button */}
+          <div className="flex justify-end gap-4">
+            <button
+              type="button"
+              onClick={() => {
+                setFormData({
+                  examTitle: '',
+                  subject: '',
+                  duration: 60,
+                  totalMarks: 100,
+                  passingMarks: 40,
+                  instructions: '',
+                  questions: [{
+                    id: 1,
+                    questionText: '',
+                    options: ['', '', '', ''],
+                    correctAnswer: 0,
+                    marks: 1
+                  }]
+                });
+                setCurrentQuestion(0);
+              }}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
             >
-              <FiArrowLeft className="w-4 h-4" />
-              Back to Exams
-            </Link>
-            
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={handleReset}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition flex items-center gap-2"
-              >
-                <FiRefreshCw className="w-4 h-4" />
-                Reset Changes
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <FiSave className="w-4 h-4" />
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
+              Reset
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
+            >
+              Create Exam
+            </button>
           </div>
         </form>
       </div>

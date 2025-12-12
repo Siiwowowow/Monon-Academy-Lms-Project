@@ -1,203 +1,671 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import useAxiosSecure from "@/hooks/useAxiosSecure";
-import useAuth from "@/hooks/useAuth";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "react-hot-toast";
-import { FaClock, FaBook, FaGraduationCap, FaPaperPlane, FaArrowRight, FaListOl } from "react-icons/fa";
-import ExamResult from "../ExamResult/ExamResult";
+import { 
+  FiArrowLeft, FiEdit2, FiTrash2, FiCopy, FiDownload,
+  FiEye, FiClock, FiBook, FiUsers, FiBarChart2,
+  FiCheckCircle, FiXCircle, FiUser, FiCalendar, FiInfo,
+  FiSettings, FiChevronRight, FiMail, FiBriefcase,
+  FiShare2
+} from "react-icons/fi";
 
-export default function TakeExamPage() {
-  const axiosSecure = useAxiosSecure();
-  const { user } = useAuth();
-  const { id } = useParams();
+export default function SingleExamView() {
+  const params = useParams();
+  const router = useRouter();
+  const examId = params.id;
+  
+  const [exam, setExam] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("details");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const [answers, setAnswers] = useState({});
-  const [showResult, setShowResult] = useState(false);
-  const [submittedAnswers, setSubmittedAnswers] = useState({});
-  const [score, setScore] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(0);
-
-  // Fetch exam by ID
-  const { data: exam, isLoading, isError } = useQuery({
-    queryKey: ["exam", id],
-    queryFn: async () => {
-      const res = await axiosSecure.get(`/api/exams/${id}`);
-      return res.data.exam;
-    },
-    onError: () => toast.error("Failed to load exam"),
-  });
-
-  // Initialize timer
+  // Fetch exam data
   useEffect(() => {
-    if (exam?.duration) setTimeLeft(exam.duration * 60);
-  }, [exam]);
+    if (examId) {
+      fetchExamData();
+    }
+  }, [examId]);
 
-  // Timer countdown
-  useEffect(() => {
-    if (timeLeft <= 0) return;
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleAutoSubmit();
-          return 0;
-        }
-        return prev - 1;
+  const fetchExamData = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/tests/mcq/${examId}`);
+      const data = await res.json();
+
+      if (data.success) {
+        setExam(data.exam);
+      } else {
+        toast.error(data.message || "Failed to load exam");
+        router.push("/dashboard/teacher/exams");
+      }
+    } catch (error) {
+      console.error("Error fetching exam:", error);
+      toast.error("Error loading exam");
+      router.push("/dashboard/teacher/exams");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle delete
+  const handleDelete = async () => {
+    try {
+      const res = await fetch(`/api/tests/mcq/${examId}`, { method: "DELETE" });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success("Exam deleted successfully");
+        router.push("/dashboard/teacher/exams");
+      } else {
+        toast.error(data.message || "Failed to delete exam");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("Something went wrong!");
+    }
+  };
+
+  // Duplicate exam
+  const handleDuplicate = async () => {
+    try {
+      const toastId = toast.loading("Duplicating exam...");
+      
+      const duplicateData = {
+        ...exam,
+        examTitle: `${exam.examTitle} (Copy)`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        _id: undefined,
+        attempts: 0,
+        averageScore: 0,
+        passRate: 0
+      };
+
+      const res = await fetch("/api/tests/mcq", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(duplicateData),
       });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft]);
 
-  const answeredCount = Object.keys(answers).length;
-  const totalQuestions = exam?.questions?.length || 0;
-  const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
+      const data = await res.json();
+      toast.dismiss(toastId);
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleAnswerChange = (qIndex, option) => {
-    setAnswers(prev => ({ ...prev, [qIndex]: option }));
-  };
-
-  // Auto submit
-  const handleAutoSubmit = async () => {
-  toast.error("⏰ Time's up! Submitting exam...");
-  try {
-    const res = await axiosSecure.post(`/api/exams/${id}/submit`, {
-      studentId: user?.email,
-      answers,
-      timeSpent: exam.duration * 60 - timeLeft
-    });
-
-    if (res.data.success) {
-      const result = res.data.result;
-      setSubmittedAnswers(answers);
-      setScore(result.obtained_marks); 
-      setTotal(result.total_marks);
-      setShowResult(true);
-      toast.success(`Auto-submitted! You scored ${result.obtained_marks}/${result.total_marks}`);
+      if (data.success) {
+        toast.success("Exam duplicated successfully");
+        router.push(`/dashboard/teacher/edit-exam/${data.examId || data.data?._id}`);
+      } else {
+        toast.error(data.message || "Failed to duplicate exam");
+      }
+    } catch (error) {
+      console.error("Duplicate error:", error);
+      toast.error("Error duplicating exam");
     }
-  } catch (err) {
-    console.error(err);
-    toast.error("Error auto-submitting exam");
-  }
-};
-
-  // Manual submit
-  const handleSubmit = async () => {
-  try {
-    const res = await axiosSecure.post(`/api/exams/${id}/submit`, {
-      studentId: user?.email,
-      answers,
-      timeSpent: exam.duration * 60 - timeLeft
-    });
-
-    if (res.data.success) {
-      const result = res.data.result; // ✅ use result from backend
-      setSubmittedAnswers(answers);
-      setScore(result.obtained_marks); // ✅ total score
-      setTotal(result.total_marks);     // ✅ max score
-      setShowResult(true);
-      toast.success(`🎉 You scored ${result.obtained_marks}/${result.total_marks}`);
-    } else {
-      toast.error(res.data.error || "Failed to submit exam");
-    }
-  } catch (err) {
-    console.error(err);
-    toast.error("Error submitting exam");
-  }
-};
-
-  const handleRetake = () => {
-    setShowResult(false);
-    setAnswers({});
-    setSubmittedAnswers({});
-    setTimeLeft(exam?.duration * 60 || 0);
   };
 
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  if (isError || !exam) return <div className="min-h-screen flex items-center justify-center">Exam not found</div>;
-  if (showResult) return <ExamResult questions={exam.questions} studentAnswers={submittedAnswers} score={score} total={total} examTitle={exam.title} onRetake={handleRetake} />;
+  // Format date
+  const formatDate = (dateString) => {
+    if (!dateString) return "Not available";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric"
+    });
+  };
+
+  // Format time
+  const formatTime = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
+
+  // Calculate time per question
+  const calculateTimePerQuestion = () => {
+    if (!exam?.questions?.length || !exam?.duration) return 0;
+    return Math.round(exam.duration / exam.questions.length);
+  };
+
+  // Calculate total marks from questions
+  const calculateTotalMarks = () => {
+    if (!exam?.questions) return 0;
+    return exam.questions.reduce((sum, q) => sum + (parseInt(q.marks) || 1), 0);
+  };
+
+  // Get exam status
+  const getExamStatus = () => {
+    if (exam?.isActive === false) {
+      return { label: "Inactive", color: "gray", icon: <FiXCircle /> };
+    }
+    return { label: "Active", color: "green", icon: <FiCheckCircle /> };
+  };
+
+  if (loading) {
+    return <LoadingState />;
+  }
+
+  if (!exam) {
+    return <NotFoundState />;
+  }
+
+  const examStatus = getExamStatus();
+  const totalMarks = calculateTotalMarks();
+  const timePerQuestion = calculateTimePerQuestion();
 
   return (
-    <div className="min-h-screen py-8 bg-gradient-to-br from-blue-50 to-green-50">
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border border-blue-200 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">{exam.title}</h1>
-            <p className="text-gray-600 text-sm mb-3">{exam.description}</p>
-            <div className="flex flex-wrap gap-3 text-gray-700 text-sm">
-              <div className="flex items-center gap-2"><FaBook className="text-blue-500" /><span><b>Subject:</b> {exam.subject}</span></div>
-              <div className="flex items-center gap-2"><FaGraduationCap className="text-green-500" /><span><b>Level:</b> {exam.educationLevel}</span></div>
-              <div className="flex items-center gap-2"><FaClock className="text-orange-500" /><span><b>Time Left:</b> {formatTime(timeLeft)}</span></div>
-            </div>
-          </div>
-          {/* Progress */}
-          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200 min-w-40 text-center">
-            <div className="flex items-center justify-center space-x-2 mb-1">
-              <FaListOl className="text-blue-600" />
-              <div className="text-xl font-bold text-blue-600">{answeredCount}/{totalQuestions}</div>
-            </div>
-            <div className="text-xs text-blue-700 mb-2">Questions Answered</div>
-            <div className="w-full bg-blue-200 rounded-full h-1.5 mb-1">
-              <div className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
-            </div>
-            <div className="text-xs text-blue-600">{Math.round(progress)}% Complete</div>
-          </div>
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+      <div className="max-w-6xl mx-auto">
+        
+        {/* Header Section */}
+        <HeaderSection 
+          exam={exam} 
+          examStatus={examStatus}
+          onDuplicate={handleDuplicate}
+          onDelete={() => setShowDeleteConfirm(true)}
+        />
+        
+        {/* Stats Overview */}
+        <StatsOverview 
+          exam={exam}
+          totalMarks={totalMarks}
+          timePerQuestion={timePerQuestion}
+        />
+        
+        {/* Navigation Tabs */}
+        <TabNavigation 
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          questionsCount={exam.questions?.length || 0}
+        />
+        
+        {/* Tab Content */}
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          {activeTab === "details" && (
+            <DetailsTab 
+              exam={exam}
+              formatDate={formatDate}
+              formatTime={formatTime}
+              timePerQuestion={timePerQuestion}
+            />
+          )}
+
+          {activeTab === "questions" && (
+            <QuestionsTab exam={exam} />
+          )}
+
+          {activeTab === "analytics" && (
+            <AnalyticsTab exam={exam} />
+          )}
         </div>
-
-        {/* Questions */}
-        <form onSubmit={e => { e.preventDefault(); answeredCount === totalQuestions ? handleSubmit() : toast.error(`Answer all ${totalQuestions} questions`) }} className="space-y-4">
-          {exam.questions.map((q, qIndex) => (
-            <QuestionCard key={qIndex} question={q} questionNumber={qIndex + 1} selectedAnswer={answers[qIndex]} onAnswerChange={opt => handleAnswerChange(qIndex, opt)} />
-          ))}
-
-          <div className="bg-white rounded-xl shadow-lg p-4 border border-green-200 sticky bottom-4">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-              <p className="text-gray-700 text-sm font-medium">
-                {answeredCount === totalQuestions ? <span className="text-green-600">✅ All questions answered!</span> : <span className="text-orange-600">⚠️ {totalQuestions - answeredCount} remaining</span>}
-              </p>
-              <button type="submit" disabled={answeredCount !== totalQuestions} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                <FaPaperPlane /><span>Submit Exam</span><FaArrowRight />
-              </button>
-            </div>
-          </div>
-        </form>
+        
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <DeleteModal 
+            exam={exam}
+            onClose={() => setShowDeleteConfirm(false)}
+            onDelete={handleDelete}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-// Question Card Component
-const QuestionCard = ({ question, questionNumber, selectedAnswer, onAnswerChange }) => {
+// ========== Component Functions ==========
+
+function LoadingState() {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-gray-50 to-blue-50 p-4 border-b border-gray-200">
-        <div className="flex items-center space-x-2 mb-1">
-          <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center"><span className="text-white font-semibold text-xs">{questionNumber}</span></div>
-          <h3 className="text-base font-semibold text-gray-900">Question {questionNumber}</h3>
-        </div>
-        <p className="text-gray-800 text-sm font-medium">{question.question_text}</p>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="mt-4 text-gray-600">Loading exam details...</p>
       </div>
-      <div className="p-4 space-y-2">
-        {question.options.map((opt, oIndex) => (
-          <label key={oIndex} className={`flex items-center space-x-3 p-3 rounded border cursor-pointer transition-all ${selectedAnswer === opt ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
-            <input type="radio" name={`q-${questionNumber}`} value={opt} checked={selectedAnswer === opt} onChange={() => onAnswerChange(opt)} className="hidden" />
-            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedAnswer === opt ? 'border-blue-500 bg-blue-500' : 'border-gray-400'}`}>
-              {selectedAnswer === opt && <div className="w-1.5 h-1.5 rounded-full bg-white"></div>}
+    </div>
+  );
+}
+
+function NotFoundState() {
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-4xl mx-auto text-center">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Exam Not Found</h2>
+        <p className="text-gray-600 mb-6">The exam you're looking for doesn't exist or has been deleted.</p>
+        <Link
+          href="/dashboard/teacher/exams"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+        >
+          <FiArrowLeft className="w-4 h-4" />
+          Back to Exams
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function HeaderSection({ exam, examStatus, onDuplicate, onDelete }) {
+  return (
+    <div className="mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/dashboard/teacher/exams"
+            className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition"
+          >
+            <FiArrowLeft className="w-5 h-5" />
+          </Link>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">{exam.examTitle}</h1>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <Badge icon={<FiBook />} color="blue" text={exam.subject || "No Subject"} />
+              <Badge 
+                icon={examStatus.icon} 
+                color={examStatus.color} 
+                text={examStatus.label} 
+              />
+              {exam.category && (
+                <Badge text={exam.category} color="purple" />
+              )}
             </div>
-            <span className="flex-1 text-gray-700 text-sm">{opt}</span>
-            <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center"><span className="text-gray-600 text-xs font-medium">{String.fromCharCode(65 + oIndex)}</span></div>
-          </label>
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={onDuplicate}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2"
+          >
+            <FiCopy className="w-4 h-4" />
+            Duplicate
+          </button>
+          <Link
+            href={`/dashboard/teacher/edit-exam/${exam._id}`}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2"
+          >
+            <FiEdit2 className="w-4 h-4" />
+            Edit Exam
+          </Link>
+          <button
+            onClick={onDelete}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-2"
+          >
+            <FiTrash2 className="w-4 h-4" />
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatsOverview({ exam, totalMarks, timePerQuestion }) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <StatCard
+        icon={<FiBook />}
+        label="Total Marks"
+        value={totalMarks}
+        color="blue"
+      />
+      <StatCard
+        icon={<FiBarChart2 />}
+        label="Questions"
+        value={exam.questions?.length || 0}
+        color="green"
+      />
+      <StatCard
+        icon={<FiClock />}
+        label="Duration"
+        value={`${exam.duration || 0} min`}
+        color="orange"
+        subtext={`${timePerQuestion} min per question`}
+      />
+      <StatCard
+        icon={<FiUsers />}
+        label="Passing Marks"
+        value={exam.passingMarks || 0}
+        color="purple"
+        subtext={`${Math.round((exam.passingMarks / totalMarks) * 100)}% required`}
+      />
+    </div>
+  );
+}
+
+function TabNavigation({ activeTab, setActiveTab, questionsCount }) {
+  const tabs = [
+    { id: "details", label: "Exam Details", icon: <FiInfo /> },
+    { id: "questions", label: `Questions (${questionsCount})`, icon: <FiBarChart2 /> },
+    { id: "analytics", label: "Analytics", icon: <FiSettings /> }
+  ];
+
+  return (
+    <div className="mb-6">
+      <div className="flex border-b overflow-x-auto">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-4 py-3 font-medium text-sm md:text-base whitespace-nowrap transition ${activeTab === tab.id ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-600 hover:text-gray-800"}`}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
         ))}
       </div>
     </div>
   );
-};
+}
+
+function DetailsTab({ exam, formatDate, formatTime, timePerQuestion }) {
+  return (
+    <div className="space-y-6">
+      {/* Instructions */}
+      <Section title="Exam Description">
+        <p className="text-gray-600 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg">
+          {exam.instructions || "No instructions provided for this exam."}
+        </p>
+      </Section>
+
+      {/* Two Column Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Exam Information */}
+        <Section title="Exam Information">
+          <InfoRow label="Subject" value={exam.subject || "Not specified"} />
+          <InfoRow label="Category" value={exam.category || "General"} />
+          <InfoRow label="Difficulty" value={exam.difficulty || "Medium"} />
+          <InfoRow label="Created Date" value={formatDate(exam.createdAt)} />
+          <InfoRow label="Created Time" value={formatTime(exam.createdAt)} />
+          <InfoRow label="Last Updated" value={formatDate(exam.updatedAt || exam.createdAt)} />
+        </Section>
+
+        {/* Settings */}
+        <Section title="Exam Settings">
+          <InfoRow label="Time per Question" value={`${timePerQuestion} minutes`} />
+          <InfoRow label="Attempts Allowed" value={exam.maxAttempts || "Unlimited"} />
+          <InfoRow label="Shuffle Questions" value={exam.shuffleQuestions ? "Yes" : "No"} />
+          <InfoRow label="Show Results" value={exam.showResults ? "Immediately" : "After completion"} />
+          <InfoRow label="Negative Marking" value={exam.negativeMarking ? "Yes" : "No"} />
+          <InfoRow label="Question Types" value="Multiple Choice Only" />
+        </Section>
+      </div>
+
+      {/* Instructor Information */}
+      {exam.instructorName && (
+        <Section title="Created By">
+          <div className="flex items-center gap-4 p-4 bg-blue-50 rounded-lg">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+              <FiUser className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <h4 className="font-semibold text-gray-800">{exam.instructorName}</h4>
+                <Badge 
+                  icon={<FiBriefcase />} 
+                  color="blue" 
+                  text={exam.instructorRole || "Instructor"} 
+                  size="sm"
+                />
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <FiMail className="w-4 h-4 text-gray-400" />
+                <p className="text-sm text-gray-600">{exam.instructorEmail}</p>
+              </div>
+            </div>
+          </div>
+        </Section>
+      )}
+    </div>
+  );
+}
+
+function QuestionsTab({ exam }) {
+  if (!exam.questions || exam.questions.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <FiBarChart2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <h3 className="text-lg font-semibold text-gray-700 mb-2">No Questions Found</h3>
+        <p className="text-gray-500">This exam doesn't contain any questions yet.</p>
+      </div>
+    );
+  }
+
+  const totalMarks = exam.questions.reduce((sum, q) => sum + (parseInt(q.marks) || 1), 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <h3 className="text-lg font-semibold text-gray-800">
+          Questions ({exam.questions.length})
+        </h3>
+        <div className="flex items-center gap-4 text-sm">
+          <span className="text-gray-600">Total Marks: <strong>{totalMarks}</strong></span>
+          <span className="text-gray-600">Average Marks per Question: <strong>{Math.round(totalMarks / exam.questions.length)}</strong></span>
+        </div>
+      </div>
+      
+      {exam.questions.map((question, index) => (
+        <QuestionCard key={index} question={question} index={index} />
+      ))}
+    </div>
+  );
+}
+
+function QuestionCard({ question, index }) {
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-200 transition">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
+        <div className="flex items-start gap-3 flex-1">
+          <div className="w-8 h-8 bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center font-semibold flex-shrink-0">
+            {index + 1}
+          </div>
+          <div className="flex-1">
+            <h4 className="font-medium text-gray-800 mb-1">{question.questionText}</h4>
+            <div className="flex items-center gap-3">
+              <Badge 
+                text={`${question.marks || 1} mark${question.marks > 1 ? 's' : ''}`} 
+                color="green" 
+                size="sm"
+              />
+              <Badge 
+                icon={<FiCheckCircle />}
+                text={`Correct: ${String.fromCharCode(65 + question.correctAnswer)}`}
+                color="blue"
+                size="sm"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Options */}
+      <div className="space-y-2">
+        {question.options.map((option, optIndex) => (
+          <div
+            key={optIndex}
+            className={`p-3 rounded-lg transition ${optIndex === question.correctAnswer ? 'bg-green-50 border border-green-200' : 'bg-gray-50 hover:bg-gray-100'}`}
+          >
+            <div className="flex items-center gap-3">
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 ${optIndex === question.correctAnswer ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-700'}`}>
+                {String.fromCharCode(65 + optIndex)}
+              </span>
+              <span className={optIndex === question.correctAnswer ? 'text-green-800 font-medium' : 'text-gray-700'}>
+                {option}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsTab({ exam }) {
+  return (
+    <div className="space-y-6">
+      <Section title="Exam Performance Analytics">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <AnalyticsCard
+            label="Total Attempts"
+            value={exam.attempts || 0}
+            icon={<FiUsers />}
+            color="blue"
+          />
+          <AnalyticsCard
+            label="Average Score"
+            value={exam.averageScore ? `${exam.averageScore.toFixed(1)}%` : "0%"}
+            icon={<FiBarChart2 />}
+            color="green"
+          />
+          <AnalyticsCard
+            label="Pass Rate"
+            value={exam.passRate ? `${exam.passRate.toFixed(1)}%` : "0%"}
+            icon={<FiCheckCircle />}
+            color="purple"
+          />
+        </div>
+      </Section>
+      
+      <Section title="Recent Activity">
+        <div className="text-center py-12">
+          <FiBarChart2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h4 className="text-lg font-medium text-gray-700 mb-2">No Activity Yet</h4>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Analytics data will be available once students start taking this exam. 
+            Share the exam with your students to track their performance.
+          </p>
+          <div className="mt-6">
+            <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2 mx-auto">
+              <FiShare2 className="w-4 h-4" />
+              Share Exam Link
+            </button>
+          </div>
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+function DeleteModal({ exam, onClose, onDelete }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl p-6 max-w-md w-full">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+            <FiTrash2 className="w-5 h-5 text-red-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-800">Delete Exam</h3>
+        </div>
+        <p className="text-gray-600 mb-6">
+          Are you sure you want to delete "<strong>{exam.examTitle}</strong>"? This action cannot be undone.
+          All exam data, including {exam.questions?.length || 0} questions, will be permanently deleted.
+        </p>
+        <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onDelete}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center justify-center gap-2"
+          >
+            <FiTrash2 className="w-4 h-4" />
+            Delete Exam
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ========== Reusable Helper Components ==========
+
+function Badge({ icon, text, color = "gray", size = "md" }) {
+  const colorClasses = {
+    blue: "bg-blue-100 text-blue-700",
+    green: "bg-green-100 text-green-700",
+    orange: "bg-orange-100 text-orange-700",
+    purple: "bg-purple-100 text-purple-700",
+    red: "bg-red-100 text-red-700",
+    gray: "bg-gray-100 text-gray-700"
+  };
+
+  const sizeClasses = {
+    sm: "px-2 py-1 text-xs",
+    md: "px-2.5 py-1 text-sm"
+  };
+
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full ${sizeClasses[size]} ${colorClasses[color]}`}>
+      {icon && React.cloneElement(icon, { className: "w-3 h-3" })}
+      {text}
+    </span>
+  );
+}
+
+function StatCard({ icon, label, value, color, subtext }) {
+  const colorClasses = {
+    blue: "bg-blue-50 border-blue-100",
+    green: "bg-green-50 border-green-100",
+    orange: "bg-orange-50 border-orange-100",
+    purple: "bg-purple-50 border-purple-100"
+  };
+
+  return (
+    <div className={`border rounded-lg p-4 ${colorClasses[color]}`}>
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-lg ${colorClasses[color].replace('50', '100')}`}>
+          {React.cloneElement(icon, { className: "w-5 h-5" })}
+        </div>
+        <div>
+          <p className="text-sm text-gray-600">{label}</p>
+          <p className="text-xl font-bold text-gray-800">{value}</p>
+          {subtext && (
+            <p className="text-xs text-gray-500 mt-1">{subtext}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsCard({ label, value, icon, color }) {
+  const colorClasses = {
+    blue: "bg-blue-50 text-blue-600",
+    green: "bg-green-50 text-green-600",
+    purple: "bg-purple-50 text-purple-600"
+  };
+
+  return (
+    <div className={`${colorClasses[color]} rounded-lg p-5`}>
+      <div className="flex items-center gap-3 mb-2">
+        {React.cloneElement(icon, { className: "w-5 h-5" })}
+        <p className="text-sm font-medium">{label}</p>
+      </div>
+      <p className="text-2xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function Section({ title, children }) {
+  return (
+    <div>
+      <h3 className="text-lg font-semibold text-gray-800 mb-3">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function InfoRow({ label, value }) {
+  return (
+    <div className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+      <span className="text-gray-600">{label}</span>
+      <span className="font-medium text-gray-800">{value}</span>
+    </div>
+  );
+}

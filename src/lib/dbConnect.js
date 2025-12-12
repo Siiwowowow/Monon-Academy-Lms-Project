@@ -1,9 +1,11 @@
+//src/lib/dbConnect.js
 import { MongoClient, ServerApiVersion } from "mongodb";
 
 export const collectionNameObj = {
   userCollection: "users",
   coursesCollection: "courses",
-  examCollection: "tests",
+  examMcqCollection: "examsMcq",
+  examResultsCollection: "examResults", // Add this line
   videoCollection: "videos",
   postsCollection: "posts",
   paymentCollection: "payments",
