@@ -30,35 +30,110 @@ import { AuthContext } from "@/context/AuthContext";
 import useRole from "@/hooks/useRole";
 import brandLogo from '../../../app/assets/logobrand.png';
 
-// ========== CONSTANTS ==========
+// ========== CONSTANTS & CONFIG ==========
 const ACTIVE_COLOR = "#FFC400";
 const DEFAULT_AVATAR = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=400&fit=crop&crop=face";
 
-// Navigation Links
-const NAV_LINKS = [
+// Role Configuration
+const ROLE_CONFIG = {
+  admin: { 
+    text: "Admin", 
+    icon: FaUserShield, 
+    color: "bg-red-100 text-red-800", 
+    badgeColor: "bg-red-500",
+    showDashboard: true 
+  },
+  administrator: { 
+    text: "Admin", 
+    icon: FaUserShield, 
+    color: "bg-red-100 text-red-800", 
+    badgeColor: "bg-red-500",
+    showDashboard: true 
+  },
+  instructor: { 
+    text: "Instructor", 
+    icon: FaUserTie, 
+    color: "bg-blue-100 text-blue-800", 
+    badgeColor: "bg-blue-500",
+    showDashboard: true 
+  },
+  teacher: { 
+    text: "Teacher", 
+    icon: FaUserTie, 
+    color: "bg-blue-100 text-blue-800", 
+    badgeColor: "bg-blue-500",
+    showDashboard: true 
+  },
+  student: { 
+    text: "Student", 
+    icon: FaUserGraduate, 
+    color: "bg-green-100 text-green-800", 
+    badgeColor: "bg-green-500",
+    showDashboard: true 
+  },
+  premium: { 
+    text: "Premium", 
+    icon: FaCrown, 
+    color: "bg-yellow-100 text-yellow-800", 
+    badgeColor: "bg-yellow-500",
+    showDashboard: true 
+  },
+  moderator: { 
+    text: "Moderator", 
+    icon: FaUserShield, 
+    color: "bg-orange-100 text-orange-800", 
+    badgeColor: "bg-orange-500",
+    showDashboard: true 
+  },
+  user: { 
+    text: "User", 
+    icon: FaUserGraduate, 
+    color: "bg-gray-100 text-gray-800", 
+    badgeColor: "bg-gray-500",
+    showDashboard: false // User role doesn't get dashboard
+  },
+  default: { 
+    text: "Loading...", 
+    icon: FaUserGraduate, 
+    color: "bg-gray-100 text-gray-800", 
+    badgeColor: "bg-gray-400",
+    showDashboard: false 
+  }
+};
+
+// Base Navigation Links (without dashboard)
+const BASE_NAV_LINKS = [
   { name: "Home", href: "/", icon: <FaHome /> },
   { name: "Courses", href: "/courses", icon: <FaBook /> },
   { name: "Instructors", href: "/teachers", icon: <GiTeacher /> },
-  { name: "Dashboard", href: "/dashboard", icon: <FaTachometerAlt />, authRequired: true },
   { name: "Contact", href: "/contact", icon: <FaPhoneAlt /> },
   { name: "Community", href: "/community", icon: <FaInfoCircle /> },
 ];
 
-// Role Configuration
-const ROLE_CONFIG = {
-  admin: { text: "Admin", icon: FaUserShield, color: "bg-red-100 text-red-800", badgeColor: "bg-red-500" },
-  administrator: { text: "Admin", icon: FaUserShield, color: "bg-red-100 text-red-800", badgeColor: "bg-red-500" },
-  instructor: { text: "Instructor", icon: FaUserTie, color: "bg-blue-100 text-blue-800", badgeColor: "bg-blue-500" },
-  teacher: { text: "Teacher", icon: FaUserTie, color: "bg-blue-100 text-blue-800", badgeColor: "bg-blue-500" },
-  student: { text: "Student", icon: FaUserGraduate, color: "bg-green-100 text-green-800", badgeColor: "bg-green-500" },
-  premium: { text: "Premium", icon: FaCrown, color: "bg-yellow-100 text-yellow-800", badgeColor: "bg-yellow-500" },
-  moderator: { text: "Moderator", icon: FaUserShield, color: "bg-orange-100 text-orange-800", badgeColor: "bg-orange-500" },
-  default: { text: "User", icon: FaUserGraduate, color: "bg-gray-100 text-gray-800", badgeColor: "bg-gray-500" }
+// Dashboard Link
+const DASHBOARD_LINK = { 
+  name: "Dashboard", 
+  href: "/dashboard", 
+  icon: <FaTachometerAlt />, 
+  authRequired: true 
 };
 
 // ========== HELPER FUNCTIONS ==========
-const getFilteredNavLinks = (user) => {
-  return user ? NAV_LINKS : NAV_LINKS.filter(link => !link.authRequired);
+const getFilteredNavLinks = (user, role) => {
+  // Get base links
+  const links = user ? [...BASE_NAV_LINKS] : BASE_NAV_LINKS;
+  
+  // Add dashboard if user has appropriate role
+  if (user && role) {
+    const roleLower = role.toLowerCase();
+    const roleConfig = ROLE_CONFIG[roleLower] || ROLE_CONFIG.default;
+    
+    if (roleConfig.showDashboard) {
+      links.push(DASHBOARD_LINK);
+    }
+  }
+  
+  return links;
 };
 
 const getAvatar = (user) => {
@@ -73,21 +148,18 @@ const getUserName = (user) => {
 };
 
 const getRoleInfo = (role, loading) => {
-  if (loading) return { ...ROLE_CONFIG.default, text: "Loading...", badgeColor: "bg-gray-400", loading: true };
-  if (!role || role === "user") return ROLE_CONFIG.default;
+  if (loading) return ROLE_CONFIG.default;
   
-  const roleLower = role.toLowerCase();
-  const config = ROLE_CONFIG[roleLower] || {
-    text: role.charAt(0).toUpperCase() + role.slice(1),
-    icon: FaUserGraduate,
-    color: "bg-gray-100 text-gray-800",
-    badgeColor: "bg-gray-500"
+  const roleLower = (role || "user").toLowerCase();
+  const config = ROLE_CONFIG[roleLower] || ROLE_CONFIG.user;
+  
+  return { 
+    ...config, 
+    icon: React.createElement(config.icon) 
   };
-  
-  return { ...config, icon: React.createElement(config.icon) };
 };
 
-// ========== NAVBAR COMPONENT ==========
+// ========== MAIN NAVBAR COMPONENT ==========
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
@@ -105,7 +177,7 @@ export default function Navbar() {
   const { role, loading } = useRole();
 
   // Derived Values
-  const navLinks = getFilteredNavLinks(user);
+  const navLinks = getFilteredNavLinks(user, role);
   const userAvatar = getAvatar(user);
   const userName = getUserName(user);
   const firstName = userName.split(" ")[0];
@@ -115,9 +187,9 @@ export default function Navbar() {
   // Debug logging
   useEffect(() => {
     if (user) {
-      console.log("🔍 Navbar User Info:", { email: user.email, role, loading });
+      console.log("🔍 Navbar User Info:", { email: user.email, role, loading, navLinks });
     }
-  }, [user, role, loading]);
+  }, [user, role, loading, navLinks]);
 
   // ========== LOGOUT HANDLER ==========
   const handleLogout = useCallback(async () => {
@@ -127,7 +199,6 @@ export default function Navbar() {
       setIsDropdownOpen(false);
       setIsOpen(false);
       
-      // Redirect to login page after logout
       setTimeout(() => {
         router.push('/login');
       }, 300);
@@ -201,6 +272,7 @@ export default function Navbar() {
               dropdownRef={dropdownRef}
               handleLogout={handleLogout}
               router={router}
+              navLinks={navLinks}
             />
           ) : (
             <UnauthenticatedUserSection />
@@ -230,7 +302,7 @@ export default function Navbar() {
 
 // ========== SUB-COMPONENTS ==========
 
-// Mobile Menu Button
+// 1. MOBILE MENU BUTTON
 const MobileMenuButton = ({ setIsOpen }) => (
   <button
     onClick={() => setIsOpen(true)}
@@ -243,98 +315,108 @@ const MobileMenuButton = ({ setIsOpen }) => (
   </button>
 );
 
-// Logo
+// 2. LOGO
 const Logo = () => (
   <Link href="/" className="btn btn-ghost text-xl font-bold hover:scale-105 transition-transform">
     <Image src={brandLogo} alt="Brand Logo" className="w-20 h-auto object-contain" priority />
   </Link>
 );
 
-// Desktop Navigation Links
+// 3. DESKTOP NAVIGATION LINKS
 const DesktopNavLinks = ({ navLinks, pathname }) => (
   <ul className="menu menu-horizontal px-1 gap-1">
     {navLinks.map((link) => (
       <li key={link.name}>
-        <Link
-          href={link.href}
-          className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-medium transition-all duration-300 group ${
-            pathname === link.href
-              ? "text-white shadow-lg shadow-amber-500/30"
-              : "text-gray-600 hover:bg-gray-100/50 hover:text-amber-600"
-          }`}
-          style={pathname === link.href ? { backgroundColor: ACTIVE_COLOR, color: 'white' } : {}}
-        >
-          <span className={`transition-transform duration-300 ${
-            pathname === link.href ? "scale-110" : "group-hover:scale-110"
-          }`}>
-            {link.icon}
-          </span>
-          {link.name}
-        </Link>
+        <NavLinkItem link={link} pathname={pathname} />
       </li>
     ))}
   </ul>
 );
 
-// Authenticated User Section
+const NavLinkItem = ({ link, pathname }) => (
+  <Link
+    href={link.href}
+    className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-medium transition-all duration-300 group ${
+      pathname === link.href
+        ? "text-white shadow-lg shadow-amber-500/30"
+        : "text-gray-600 hover:bg-gray-100/50 hover:text-amber-600"
+    }`}
+    style={pathname === link.href ? { backgroundColor: ACTIVE_COLOR, color: 'white' } : {}}
+  >
+    <span className={`transition-transform duration-300 ${
+      pathname === link.href ? "scale-110" : "group-hover:scale-110"
+    }`}>
+      {link.icon}
+    </span>
+    {link.name}
+  </Link>
+);
+
+// 4. AUTHENTICATED USER SECTION
 const AuthenticatedUserSection = ({ 
   user, userAvatar, firstName, roleInfo, isLoading, role, 
-  isDropdownOpen, setIsDropdownOpen, dropdownRef, handleLogout, router 
-}) => (
-  <>
-    {/* Search Button */}
-    <button 
-      className="btn btn-ghost btn-circle text-gray-600 hover:text-blue-600 hover:bg-gray-100/50 rounded-2xl"
-      onClick={() => router.push('/search')}
-    >
-      <FaSearch className="text-lg" />
-    </button>
+  isDropdownOpen, setIsDropdownOpen, dropdownRef, handleLogout, router, navLinks 
+}) => {
+  const shouldShowDashboard = navLinks.some(link => link.name === "Dashboard");
+  
+  return (
+    <>
+      {/* Search Button */}
+      <button 
+        className="btn btn-ghost btn-circle text-gray-600 hover:text-blue-600 hover:bg-gray-100/50 rounded-2xl"
+        onClick={() => router.push('/search')}
+      >
+        <FaSearch className="text-lg" />
+      </button>
 
-    {/* Notifications */}
-    <button className="btn btn-ghost btn-circle relative text-gray-600 hover:text-blue-600 hover:bg-gray-100/50 rounded-2xl hidden lg:block">
-      <FaBell className="text-lg" />
-      <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
-    </button>
+      {/* Notifications */}
+      <button className="btn btn-ghost btn-circle relative text-gray-600 hover:text-blue-600 hover:bg-gray-100/50 rounded-2xl hidden lg:block">
+        <FaBell className="text-lg" />
+        <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
+      </button>
 
-    {/* Desktop User Dropdown */}
-    <div className="relative hidden lg:block" ref={dropdownRef}>
-      <UserDropdownToggle 
+      {/* Desktop User Dropdown */}
+      <div className="relative hidden lg:block" ref={dropdownRef}>
+        <UserDropdownToggle 
+          userAvatar={userAvatar}
+          firstName={firstName}
+          roleInfo={roleInfo}
+          isLoading={isLoading}
+          isDropdownOpen={isDropdownOpen}
+          setIsDropdownOpen={setIsDropdownOpen}
+        />
+        
+        {isDropdownOpen && (
+          <UserDropdownMenu 
+            user={user}
+            userAvatar={userAvatar}
+            userName={getUserName(user)}
+            roleInfo={roleInfo}
+            role={role}
+            isLoading={isLoading}
+            setIsDropdownOpen={setIsDropdownOpen}
+            handleLogout={handleLogout}
+            shouldShowDashboard={shouldShowDashboard}
+          />
+        )}
+      </div>
+
+      {/* Mobile User Menu */}
+      <MobileUserMenu 
+        user={user}
         userAvatar={userAvatar}
         firstName={firstName}
         roleInfo={roleInfo}
+        role={role}
         isLoading={isLoading}
-        isDropdownOpen={isDropdownOpen}
-        setIsDropdownOpen={setIsDropdownOpen}
+        handleLogout={handleLogout}
+        shouldShowDashboard={shouldShowDashboard}
       />
-      
-      {isDropdownOpen && (
-        <UserDropdownMenu 
-          user={user}
-          userAvatar={userAvatar}
-          userName={getUserName(user)}
-          roleInfo={roleInfo}
-          role={role}
-          isLoading={isLoading}
-          setIsDropdownOpen={setIsDropdownOpen}
-          handleLogout={handleLogout}
-        />
-      )}
-    </div>
+    </>
+  );
+};
 
-    {/* Mobile User Menu */}
-    <MobileUserMenu 
-      user={user}
-      userAvatar={userAvatar}
-      firstName={firstName}
-      roleInfo={roleInfo}
-      role={role}
-      isLoading={isLoading}
-      handleLogout={handleLogout}
-    />
-  </>
-);
-
-// Unauthenticated User Section
+// 5. UNAUTHENTICATED USER SECTION
 const UnauthenticatedUserSection = () => (
   <>
     {/* Desktop Buttons */}
@@ -363,7 +445,7 @@ const UnauthenticatedUserSection = () => (
   </>
 );
 
-// User Dropdown Toggle
+// 6. USER DROPDOWN TOGGLE
 const UserDropdownToggle = ({ userAvatar, firstName, roleInfo, isLoading, isDropdownOpen, setIsDropdownOpen }) => (
   <button
     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -390,8 +472,11 @@ const UserDropdownToggle = ({ userAvatar, firstName, roleInfo, isLoading, isDrop
   </button>
 );
 
-// User Dropdown Menu
-const UserDropdownMenu = ({ user, userAvatar, userName, roleInfo, role, isLoading, setIsDropdownOpen, handleLogout }) => (
+// 7. USER DROPDOWN MENU
+const UserDropdownMenu = ({ 
+  user, userAvatar, userName, roleInfo, role, isLoading, 
+  setIsDropdownOpen, handleLogout, shouldShowDashboard 
+}) => (
   <div className="absolute right-0 top-full mt-3 w-80 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100/50 overflow-hidden animate-fadeIn">
     {/* User Info */}
     <div className="p-6 border-b border-gray-100/50" style={{ backgroundColor: `${ACTIVE_COLOR}15` }}>
@@ -401,7 +486,9 @@ const UserDropdownMenu = ({ user, userAvatar, userName, roleInfo, role, isLoadin
     {/* Quick Actions */}
     <div className="p-4 border-b border-gray-100/50">
       <div className="grid grid-cols-2 gap-2">
-        <QuickActionLink href="/dashboard" icon={FaTachometerAlt} label="Dashboard" setIsDropdownOpen={setIsDropdownOpen} />
+        {shouldShowDashboard && (
+          <QuickActionLink href="/dashboard" icon={FaTachometerAlt} label="Dashboard" setIsDropdownOpen={setIsDropdownOpen} />
+        )}
         <QuickActionLink href="/profile" icon={FaUserCircle} label="Profile" setIsDropdownOpen={setIsDropdownOpen} />
       </div>
     </div>
@@ -420,8 +507,8 @@ const UserDropdownMenu = ({ user, userAvatar, userName, roleInfo, role, isLoadin
   </div>
 );
 
-// Mobile User Menu
-const MobileUserMenu = ({ user, userAvatar, firstName, roleInfo, role, isLoading, handleLogout }) => (
+// 8. MOBILE USER MENU
+const MobileUserMenu = ({ user, userAvatar, firstName, roleInfo, role, isLoading, handleLogout, shouldShowDashboard }) => (
   <div className="dropdown dropdown-end lg:hidden">
     <div tabIndex={0} role="button" className="btn btn-ghost btn-circle avatar">
       <div className="w-10 rounded-full border-2 border-white shadow-lg relative">
@@ -442,13 +529,14 @@ const MobileUserMenu = ({ user, userAvatar, firstName, roleInfo, role, isLoading
       role={role}
       isLoading={isLoading}
       handleLogout={handleLogout}
+      shouldShowDashboard={shouldShowDashboard}
     />
   </div>
 );
 
-// ========== SMALLER COMPONENTS ==========
+// ========== UTILITY COMPONENTS ==========
 
-// Role Badge
+// 9. ROLE BADGE
 const RoleBadge = ({ roleInfo, isLoading }) => {
   if (isLoading) {
     return <div className="animate-pulse w-16 h-5 bg-gray-200 rounded-full"></div>;
@@ -465,7 +553,7 @@ const RoleBadge = ({ roleInfo, isLoading }) => {
   );
 };
 
-// Avatar Badge
+// 10. AVATAR BADGE
 const AvatarBadge = ({ roleInfo, mobile = false }) => {
   if (roleInfo.loading) return null;
   
@@ -485,7 +573,7 @@ const AvatarBadge = ({ roleInfo, mobile = false }) => {
   );
 };
 
-// Dropdown Arrow
+// 11. DROPDOWN ARROW
 const DropdownArrow = ({ isOpen }) => (
   <svg className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
     fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -493,7 +581,7 @@ const DropdownArrow = ({ isOpen }) => (
   </svg>
 );
 
-// User Info
+// 12. USER INFO
 const UserInfo = ({ user, userAvatar, userName, roleInfo }) => (
   <div className="flex items-center gap-4">
     <div className="relative">
@@ -515,7 +603,7 @@ const UserInfo = ({ user, userAvatar, userName, roleInfo }) => (
   </div>
 );
 
-// Quick Action Link
+// 13. QUICK ACTION LINK
 const QuickActionLink = ({ href, icon: Icon, label, setIsDropdownOpen }) => (
   <Link href={href} className="flex flex-col items-center p-3 rounded-xl bg-gray-50 hover:bg-blue-50 hover:text-blue-600 transition-all group"
     onClick={() => setIsDropdownOpen(false)}>
@@ -524,7 +612,7 @@ const QuickActionLink = ({ href, icon: Icon, label, setIsDropdownOpen }) => (
   </Link>
 );
 
-// Dropdown Link
+// 14. DROPDOWN LINK
 const DropdownLink = ({ href, icon: Icon, label, setIsDropdownOpen }) => (
   <Link href={href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-all group"
     onClick={() => setIsDropdownOpen(false)}>
@@ -533,8 +621,8 @@ const DropdownLink = ({ href, icon: Icon, label, setIsDropdownOpen }) => (
   </Link>
 );
 
-// Mobile Dropdown Menu
-const MobileDropdownMenu = ({ user, userAvatar, firstName, roleInfo, role, isLoading, handleLogout }) => (
+// 15. MOBILE DROPDOWN MENU
+const MobileDropdownMenu = ({ user, userAvatar, firstName, roleInfo, role, isLoading, handleLogout, shouldShowDashboard }) => (
   <ul tabIndex={0} className="mt-3 z-[1] p-2 shadow-2xl menu menu-sm dropdown-content bg-white/95 backdrop-blur-xl rounded-2xl w-72 border border-gray-100/50">
     <li className="p-4 border-b border-gray-100/50" style={{ backgroundColor: `${ACTIVE_COLOR}15` }}>
       <div className="flex items-center gap-3">
@@ -555,7 +643,7 @@ const MobileDropdownMenu = ({ user, userAvatar, firstName, roleInfo, role, isLoa
         </div>
       </div>
     </li>
-    <li><Link href="/dashboard"><FaTachometerAlt />Dashboard</Link></li>
+    {shouldShowDashboard && <li><Link href="/dashboard"><FaTachometerAlt />Dashboard</Link></li>}
     {!isLoading && role && (role.toLowerCase() === 'admin' || role.toLowerCase() === 'administrator') && (
       <li><Link href="/admin"><MdAdminPanelSettings />Admin Panel</Link></li>
     )}
@@ -565,8 +653,11 @@ const MobileDropdownMenu = ({ user, userAvatar, firstName, roleInfo, role, isLoa
   </ul>
 );
 
-// ========== MOBILE DRAWER ==========
-const MobileDrawer = ({ isOpen, setIsOpen, user, userName, firstName, userAvatar, userEmail, roleInfo, isLoading, role, navLinks, pathname, handleLogout }) => (
+// ========== MOBILE DRAWER COMPONENT ==========
+const MobileDrawer = ({ 
+  isOpen, setIsOpen, user, userName, firstName, userAvatar, userEmail, 
+  roleInfo, isLoading, role, navLinks, pathname, handleLogout 
+}) => (
   <>
     {isOpen && (
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden animate-fadeIn"
@@ -589,6 +680,7 @@ const MobileDrawer = ({ isOpen, setIsOpen, user, userName, firstName, userAvatar
           isLoading={isLoading}
           setIsOpen={setIsOpen}
           handleLogout={handleLogout}
+          shouldShowDashboard={navLinks.some(link => link.name === "Dashboard")}
         />
         
         <FooterSection />
@@ -597,7 +689,7 @@ const MobileDrawer = ({ isOpen, setIsOpen, user, userName, firstName, userAvatar
   </>
 );
 
-// Drawer Header
+// 16. DRAWER HEADER
 const DrawerHeader = ({ setIsOpen }) => (
   <div className="flex items-center justify-between p-6 border-b border-gray-100/50">
     <Link href="/" className="text-2xl font-bold bg-clip-text text-transparent"
@@ -612,7 +704,7 @@ const DrawerHeader = ({ setIsOpen }) => (
   </div>
 );
 
-// User Profile Section
+// 17. USER PROFILE SECTION
 const UserProfileSection = ({ user, firstName, userAvatar, userEmail, roleInfo }) => (
   <div className="mb-8 p-4 rounded-2xl border border-gray-100/50" style={{ backgroundColor: `${ACTIVE_COLOR}15` }}>
     <div className="flex items-center gap-4">
@@ -636,7 +728,7 @@ const UserProfileSection = ({ user, firstName, userAvatar, userEmail, roleInfo }
   </div>
 );
 
-// Navigation Links
+// 18. NAVIGATION LINKS
 const NavigationLinks = ({ navLinks, pathname, setIsOpen }) => (
   <ul className="space-y-2 mb-8">
     {navLinks.map((link) => (
@@ -661,8 +753,8 @@ const NavigationLinks = ({ navLinks, pathname, setIsOpen }) => (
   </ul>
 );
 
-// Auth Section
-const AuthSection = ({ user, role, isLoading, setIsOpen, handleLogout }) => (
+// 19. AUTH SECTION
+const AuthSection = ({ user, role, isLoading, setIsOpen, handleLogout, shouldShowDashboard }) => (
   <div className="space-y-3">
     {user ? (
       <>
@@ -670,6 +762,12 @@ const AuthSection = ({ user, role, isLoading, setIsOpen, handleLogout }) => (
           onClick={() => setIsOpen(false)}>
           <FaUserCircle className="mr-2" /> View Profile
         </Link>
+        {shouldShowDashboard && (
+          <Link href="/dashboard" className="btn w-full bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-2xl font-medium transition-all"
+            onClick={() => setIsOpen(false)}>
+            <FaTachometerAlt className="mr-2" /> Dashboard
+          </Link>
+        )}
         {!isLoading && role && (role.toLowerCase() === 'admin' || role.toLowerCase() === 'administrator') && (
           <Link href="/admin" className="btn w-full bg-red-50 text-red-600 hover:bg-red-100 rounded-2xl font-medium transition-all"
             onClick={() => setIsOpen(false)}>
@@ -695,7 +793,7 @@ const AuthSection = ({ user, role, isLoading, setIsOpen, handleLogout }) => (
   </div>
 );
 
-// Footer Section
+// 20. FOOTER SECTION
 const FooterSection = () => (
   <div className="mt-8 p-4 rounded-2xl border border-gray-100/50" style={{ backgroundColor: `${ACTIVE_COLOR}15` }}>
     <p className="text-sm text-gray-700 text-center font-medium">🚀 Start your learning journey today!</p>

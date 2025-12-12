@@ -1,3 +1,4 @@
+//src/app/dashboard/teacher/myCourses/page.jsx
 "use client";
 
 import React, { useEffect, useState } from "react";

@@ -159,7 +159,7 @@ export default function DashboardSidebar({ open, setOpen }) {
       links: [
         { href: "/", label: "Home", icon: <FaHome /> },
         { href: "/dashboard/user/profile", label: "Profile", icon: <FaUser /> },
-        { href: "/dashboard/user/overview", label: "Overview", icon: <FaChartLine /> },
+        // { href: "/dashboard/user/overview", label: "Overview", icon: <FaChartLine /> },
       ],
     },
   };
